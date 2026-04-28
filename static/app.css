@@ -737,6 +737,25 @@ textarea {
   color: var(--muted);
 }
 
+.auth-link-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-inline-link {
+  color: #153385;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-inline-link:hover {
+  text-decoration: underline;
+}
+
+.auth-actions-stacked {
+  align-items: stretch;
+}
+
 .public-shell {
   max-width: 1180px;
   margin: 0 auto;

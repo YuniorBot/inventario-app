@@ -53,6 +53,20 @@ class FakeS3Client:
         )
 
 
+class FakeSESClient:
+    def __init__(self):
+        self.messages = []
+
+    def send_email(self, Source, Destination, Message):
+        payload = {
+            "Source": Source,
+            "Destination": Destination,
+            "Message": Message,
+        }
+        self.messages.append(payload)
+        return {"MessageId": f"fake-message-{len(self.messages)}"}
+
+
 @pytest.fixture()
 def app(tmp_path):
     database_path = tmp_path / "test.db"
@@ -71,12 +85,18 @@ def app(tmp_path):
             "UPLOAD_FOLDER": str(upload_dir),
             "PDF_FOLDER": str(pdf_dir),
             "S3_BUCKET_NAME": "test-bucket",
+            "AWS_REGION": "us-east-2",
+            "APP_BASE_URL": "https://intoryx.test",
+            "AWS_SES_FROM_EMAIL": "no-reply@intoryx.com",
+            "AWS_SES_FROM_NAME": "Intoryx",
             "S3_UPLOAD_PREFIX": "uploads",
             "S3_PDF_PREFIX": "pdfs",
             "S3_SIGNED_URL_EXPIRES": 300,
+            "PASSWORD_RESET_TOKEN_TTL_SECONDS": 300,
         }
     )
     app.extensions["s3_client"] = FakeS3Client()
+    app.extensions["ses_client"] = FakeSESClient()
 
     with app.app_context():
         db.drop_all()

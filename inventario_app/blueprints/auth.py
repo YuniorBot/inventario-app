@@ -16,6 +16,11 @@ from werkzeug.security import check_password_hash
 from ..constants import ROLE_SUPERADMIN, STATUS_ACTIVE, VALID_ROLES
 from ..models import Usuario
 from ..services.access import user_is_superadmin
+from ..services.password_reset_service import (
+    get_valid_password_reset_token,
+    request_password_reset,
+    reset_password_with_token,
+)
 
 
 bp = Blueprint("auth", __name__)
@@ -33,6 +38,12 @@ def _is_safe_redirect_target(target: str | None) -> bool:
     )
 
 
+def _redirect_authenticated_user():
+    if user_is_superadmin(current_user):
+        return redirect(url_for("superadmin.superadmin_empresas"))
+    return redirect(url_for("dashboard.index"))
+
+
 @bp.route("/registro", methods=["GET", "POST"], endpoint="registro")
 def registro():
     flash(
@@ -45,9 +56,7 @@ def registro():
 @bp.route("/login", methods=["GET", "POST"], endpoint="login")
 def login():
     if current_user.is_authenticated:
-        if user_is_superadmin(current_user):
-            return redirect(url_for("superadmin.superadmin_empresas"))
-        return redirect(url_for("dashboard.index"))
+        return _redirect_authenticated_user()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -101,6 +110,62 @@ def login():
         flash("Credenciales invalidas.", "error")
 
     return render_template("login.html")
+
+
+@bp.route("/olvide-password", methods=["GET", "POST"], endpoint="forgot_password")
+def forgot_password():
+    if current_user.is_authenticated:
+        return _redirect_authenticated_user()
+
+    if request.method == "POST":
+        email = request.form.get("email", "")
+        try:
+            request_password_reset(email)
+        except Exception:
+            current_app.logger.exception(
+                "password_reset_request_failed email=%s", email.strip().lower()
+            )
+
+        flash(
+            "Si el correo existe y esta habilitado, te enviaremos instrucciones para restablecer la contrasena.",
+            "info",
+        )
+        return redirect(url_for("auth.login"))
+
+    return render_template("forgot_password.html")
+
+
+@bp.route(
+    "/restablecer-password/<string:token>",
+    methods=["GET", "POST"],
+    endpoint="reset_password",
+)
+def reset_password(token):
+    if current_user.is_authenticated:
+        return _redirect_authenticated_user()
+
+    token_record = get_valid_password_reset_token(token)
+    if token_record is None:
+        flash("El enlace de restablecimiento no es valido o ya expiro.", "error")
+        return redirect(url_for("auth.forgot_password"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        password_confirm = request.form.get("password_confirm", "")
+
+        if password != password_confirm:
+            flash("Las contrasenas no coinciden.", "error")
+            return render_template("reset_password.html", token=token)
+
+        success, message = reset_password_with_token(token, password)
+        flash(message, "success" if success else "error")
+        if success:
+            current_app.logger.info(
+                "password_reset_completed user_id=%s", token_record.usuario_id
+            )
+            return redirect(url_for("auth.login"))
+
+    return render_template("reset_password.html", token=token)
 
 
 @bp.route("/logout", methods=["POST"], endpoint="logout")
