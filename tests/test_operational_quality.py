@@ -1,3 +1,4 @@
+from io import BytesIO
 from unittest.mock import patch
 
 from inventario_app.extensions import db
@@ -37,7 +38,7 @@ def test_pdf_generation_failure_returns_message(client, login, seeded_data):
     login(seeded_data["admin_a"].email)
 
     with patch(
-        "inventario_app.blueprints.inventarios.build_inventory_pdf",
+        "inventario_app.jobs.pdf_jobs.build_inventory_pdf",
         side_effect=RuntimeError("boom"),
     ):
         response = client.get(
@@ -129,7 +130,7 @@ def test_pdf_only_uses_sections_with_observations(client, login, seeded_data, ap
         db.session.commit()
 
     with patch(
-        "inventario_app.blueprints.inventarios.build_inventory_pdf"
+        "inventario_app.jobs.pdf_jobs.build_inventory_pdf"
     ) as build_pdf:
         build_pdf.return_value = "inventario_1.pdf"
 
@@ -155,7 +156,7 @@ def test_pdf_only_uses_sections_with_media(
         db.session.commit()
 
     with patch(
-        "inventario_app.blueprints.inventarios.build_inventory_pdf"
+        "inventario_app.jobs.pdf_jobs.build_inventory_pdf"
     ) as build_pdf:
         build_pdf.return_value = "inventario_1.pdf"
 
@@ -178,7 +179,7 @@ def test_pdf_only_uses_sections_with_description(client, login, seeded_data, app
     )
 
     with patch(
-        "inventario_app.blueprints.inventarios.build_inventory_pdf"
+        "inventario_app.jobs.pdf_jobs.build_inventory_pdf"
     ) as build_pdf:
         build_pdf.return_value = "inventario_1.pdf"
 
@@ -232,6 +233,9 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
             patch.object(pdf_service, "Paragraph", lambda text, _style: text),
             patch.object(pdf_service, "Spacer", lambda *_args: "SPACER"),
             patch.object(pdf_service, "Image", FakeImage),
+            patch.object(
+                pdf_service, "_prepare_pdf_image", lambda _payload: BytesIO(b"image")
+            ),
             patch.object(
                 pdf_service,
                 "_append_gallery",

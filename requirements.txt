@@ -9,3 +9,6 @@ pytest
 reportlab
 gunicorn
 psycopg2-binary
+redis
+rq
+Pillow

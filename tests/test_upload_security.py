@@ -75,7 +75,6 @@ def test_uploaded_media_requires_company_access(client, login, seeded_data, app)
         Body=b"private image",
         ContentType="image/png",
     )
-
     anonymous_response = client.get(f"/media/uploads/{foto_id}", follow_redirects=False)
     assert anonymous_response.status_code == 302
 
@@ -97,7 +96,6 @@ def test_public_media_route_requires_matching_token(client, seeded_data, app):
         Body=b"public image",
         ContentType="image/png",
     )
-
     ok_response = client.get(
         f"/publico/{seeded_data['inventario_a'].token}/media/{foto_id}"
     )
@@ -120,6 +118,9 @@ def test_generated_pdf_route_requires_login(client, login, seeded_data, app):
         Body=b"%PDF-1.4\nmock pdf",
         ContentType="application/pdf",
     )
+    seeded_data["inventario_a"].pdf_status = "ready"
+    seeded_data["inventario_a"].pdf_filename = filename
+    db.session.commit()
 
     anonymous_response = client.get(
         f"/media/pdfs/{seeded_data['inventario_a'].id}", follow_redirects=False
@@ -147,6 +148,9 @@ def test_generated_pdf_route_blocks_other_company(client, login, seeded_data, ap
         Body=b"%PDF-1.4\nprivate pdf",
         ContentType="application/pdf",
     )
+    seeded_data["inventario_a"].pdf_status = "ready"
+    seeded_data["inventario_a"].pdf_filename = filename
+    db.session.commit()
 
     login(seeded_data["admin_b"].email)
     response = client.get(f"/media/pdfs/{seeded_data['inventario_a'].id}")

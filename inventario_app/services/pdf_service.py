@@ -2,6 +2,8 @@ import base64
 from html import escape
 from io import BytesIO
 
+from flask import current_app
+from PIL import Image as PILImage, ImageOps, UnidentifiedImageError
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -16,6 +18,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 from .media_service import get_uploaded_file_bytes, upload_pdf_bytes
+
+PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
 
 
 def build_inventory_pdf(inventario, secciones, firmas) -> str:
@@ -108,22 +112,28 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
         tiene_evidencia = False
         galeria = []
         for foto in seccion.fotos:
+            ext = foto.archivo.rsplit(".", 1)[-1].lower()
+            if ext not in PDF_IMAGE_EXTENSIONS:
+                continue
+
             archivo_bytes = get_uploaded_file_bytes(foto.archivo)
             if not archivo_bytes:
                 continue
 
+            imagen_buffer = _prepare_pdf_image(archivo_bytes)
+            if imagen_buffer is None:
+                current_app.logger.warning(
+                    "pdf_image_skipped inventario_id=%s archivo=%s",
+                    inventario.id,
+                    foto.archivo,
+                )
+                continue
+
             tiene_evidencia = True
-            ext = foto.archivo.rsplit(".", 1)[-1].lower()
-            if ext in {"jpg", "jpeg", "png", "gif", "webp"}:
-                imagen_buffer = BytesIO(archivo_bytes)
-                imagen = Image(imagen_buffer)
-                imagen._source_buffer = imagen_buffer
-                imagen._restrictSize(2.6 * inch, 2.1 * inch)
-                galeria.append(imagen)
-            else:
-                if galeria:
-                    _append_gallery(elementos, galeria)
-                    galeria = []
+            imagen = Image(imagen_buffer)
+            imagen._source_buffer = imagen_buffer
+            imagen._restrictSize(2.6 * inch, 2.1 * inch)
+            galeria.append(imagen)
 
         if galeria:
             _append_gallery(elementos, galeria)
@@ -217,6 +227,32 @@ def _append_gallery(elementos, galeria) -> None:
         )
     )
     elementos.append(tabla_galeria)
+
+
+def _prepare_pdf_image(payload: bytes) -> BytesIO | None:
+    try:
+        with PILImage.open(BytesIO(payload)) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail(
+                (
+                    current_app.config.get("PDF_IMAGE_MAX_WIDTH", 1200),
+                    current_app.config.get("PDF_IMAGE_MAX_HEIGHT", 900),
+                )
+            )
+            if image.mode not in {"RGB", "L"}:
+                image = image.convert("RGB")
+
+            output = BytesIO()
+            image.save(
+                output,
+                format="JPEG",
+                optimize=True,
+                quality=current_app.config.get("PDF_IMAGE_JPEG_QUALITY", 78),
+            )
+            output.seek(0)
+            return output
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
 
 
 def _safe_text(value) -> str:

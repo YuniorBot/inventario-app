@@ -8,6 +8,7 @@ from flask import current_app
 
 from ..extensions import db
 from ..models import Firma, Inventario, Seccion
+from ..services.pdf_queue_service import mark_inventory_pdf_dirty
 from ..utils.dates import parse_iso_date
 
 DEFAULT_SECTION_NAMES = [
@@ -114,6 +115,9 @@ def save_inventory_signature(
             imagen=imagen,
         )
     )
+    inventario = db.session.get(Inventario, inventario_id)
+    if inventario:
+        mark_inventory_pdf_dirty(inventario)
     db.session.commit()
     return SaveSignatureResult(is_valid=True)
 

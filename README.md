@@ -22,6 +22,9 @@ Variables principales:
 - `SUPERADMIN_EMAIL`
 - `SUPERADMIN_PASSWORD`
 - `MAX_CONTENT_LENGTH`
+- `REDIS_URL`
+- `PDF_QUEUE_NAME`
+- `PDF_JOB_TIMEOUT_SECONDS`
 
 ## Storage local persistente
 
@@ -67,6 +70,14 @@ flask --app app db upgrade
 ```bash
 python run_local.py
 ```
+
+6. Para generar PDFs en segundo plano, inicia Redis y ejecuta el worker en otra terminal:
+
+```bash
+python worker.py
+```
+
+En produccion deben existir dos procesos: `web` para Flask/Gunicorn y `worker` para la cola de PDFs. La ruta de generacion solo encola el trabajo; el worker crea el archivo y actualiza el estado en la base de datos.
 
 ## Migraciones
 

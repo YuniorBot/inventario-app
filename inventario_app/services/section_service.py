@@ -5,6 +5,7 @@ from flask import current_app
 from ..extensions import db
 from ..models import Foto, Observacion, Seccion
 from ..services.media_service import delete_uploaded_file, save_uploaded_file
+from ..services.pdf_queue_service import mark_inventory_pdf_dirty
 from ..utils.files import validate_uploaded_file
 
 
@@ -16,6 +17,7 @@ class UploadSectionFilesResult:
 
 def save_section_description(seccion: Seccion, descripcion: str) -> None:
     seccion.descripcion = descripcion.strip() or None
+    mark_inventory_pdf_dirty(seccion.inventario)
     db.session.commit()
     current_app.logger.info("descripcion_updated seccion_id=%s", seccion.id)
 
@@ -52,6 +54,7 @@ def upload_section_files(seccion: Seccion, archivos) -> UploadSectionFilesResult
         saved_count += 1
 
     if saved_count:
+        mark_inventory_pdf_dirty(seccion.inventario)
         db.session.commit()
         current_app.logger.info(
             "upload_saved seccion_id=%s cantidad=%s", seccion.id, saved_count
@@ -64,6 +67,7 @@ def upload_section_files(seccion: Seccion, archivos) -> UploadSectionFilesResult
 
 def delete_section_photo(foto: Foto) -> int:
     seccion_id = foto.seccion_id
+    mark_inventory_pdf_dirty(foto.seccion.inventario)
     db.session.delete(foto)
     db.session.commit()
     delete_uploaded_file(foto.archivo)
@@ -79,6 +83,7 @@ def create_section_observation(seccion: Seccion, comentario: str) -> bool:
         return False
 
     db.session.add(Observacion(seccion_id=seccion.id, comentario=comentario))
+    mark_inventory_pdf_dirty(seccion.inventario)
     db.session.commit()
     current_app.logger.info("observacion_created seccion_id=%s", seccion.id)
     return True
@@ -89,7 +94,10 @@ def create_inventory_section(inventario_id: int, nombre: str) -> bool:
     if not nombre:
         return False
 
-    db.session.add(Seccion(inventario_id=inventario_id, nombre=nombre))
+    seccion = Seccion(inventario_id=inventario_id, nombre=nombre)
+    db.session.add(seccion)
+    db.session.flush()
+    mark_inventory_pdf_dirty(seccion.inventario)
     db.session.commit()
     return True
 
@@ -97,6 +105,7 @@ def create_inventory_section(inventario_id: int, nombre: str) -> bool:
 def delete_inventory_section(seccion: Seccion) -> int:
     inventario_id = seccion.inventario_id
     archivos = [foto.archivo for foto in seccion.fotos]
+    mark_inventory_pdf_dirty(seccion.inventario)
     db.session.delete(seccion)
     db.session.commit()
     for archivo in archivos:
@@ -110,5 +119,6 @@ def rename_section(seccion: Seccion, nombre: str) -> bool:
         return False
 
     seccion.nombre = nombre
+    mark_inventory_pdf_dirty(seccion.inventario)
     db.session.commit()
     return True

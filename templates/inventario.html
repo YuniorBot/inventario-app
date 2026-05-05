@@ -18,7 +18,13 @@
       </div>
       <div class="hero-actions">
         <a class="button" href="/publico/{{ inventario.token }}" target="_blank" rel="noopener noreferrer">Ver Link Público</a>
+        {% if inventario.pdf_status == "ready" %}
+        <a class="button button-secondary" href="/media/pdfs/{{ inventario.id }}">Descargar PDF</a>
+        {% elif inventario.pdf_status in ["pending", "processing"] %}
+        <a class="button button-secondary" href="/inventario_pdf/{{ inventario.id }}">PDF generándose</a>
+        {% else %}
         <a class="button button-secondary" href="/inventario_pdf/{{ inventario.id }}">Generar PDF</a>
+        {% endif %}
       </div>
     </div>
 
@@ -67,7 +73,27 @@
     <h3>Acciones clave</h3>
     <div class="stack">
       <a class="button" href="/publico/{{ inventario.token }}" target="_blank" rel="noopener noreferrer">Abrir Vista Pública</a>
-      <a class="button button-secondary" href="/inventario_pdf/{{ inventario.id }}">Descargar PDF</a>
+      {% if inventario.pdf_status == "ready" %}
+      <a class="button button-secondary" id="pdf-action" href="/media/pdfs/{{ inventario.id }}">Descargar PDF</a>
+      {% elif inventario.pdf_status in ["pending", "processing"] %}
+      <a class="button button-secondary" id="pdf-action" href="/inventario_pdf/{{ inventario.id }}">PDF generándose</a>
+      {% else %}
+      <a class="button button-secondary" id="pdf-action" href="/inventario_pdf/{{ inventario.id }}">Generar PDF</a>
+      {% endif %}
+      <article class="workflow-step compact-step" id="pdf-status-panel" data-status-url="/inventario_pdf_estado/{{ inventario.id }}">
+        <strong>Estado del PDF</strong>
+        <p id="pdf-status-text">
+          {% if inventario.pdf_status == "ready" %}
+          PDF listo para descargar.
+          {% elif inventario.pdf_status in ["pending", "processing"] %}
+          Generando PDF en segundo plano. Puedes seguir trabajando.
+          {% elif inventario.pdf_status == "failed" %}
+          La ultima generacion fallo. Intenta generar nuevamente.
+          {% else %}
+          Aun no se ha generado el PDF final.
+          {% endif %}
+        </p>
+      </article>
       <article class="workflow-step compact-step">
         <strong>Uso recomendado</strong>
         <p>Comparte el enlace publico con clientes o equipo operativo sin exponer el panel administrativo.</p>
@@ -167,6 +193,39 @@
 
 {% block scripts %}
 <script>
+  const pdfStatusPanel = document.getElementById("pdf-status-panel")
+  if (pdfStatusPanel) {
+    const statusUrl = pdfStatusPanel.dataset.statusUrl
+    const statusText = document.getElementById("pdf-status-text")
+    const pdfAction = document.getElementById("pdf-action")
+
+    async function consultarPdf() {
+      const response = await fetch(statusUrl, { headers: { "Accept": "application/json" } })
+      if (!response.ok) return
+
+      const data = await response.json()
+      if (data.status === "ready" && data.download_url) {
+        statusText.textContent = "PDF listo para descargar."
+        pdfAction.textContent = "Descargar PDF"
+        pdfAction.href = data.download_url
+        return
+      }
+
+      if (data.status === "failed") {
+        statusText.textContent = data.error || "No se pudo generar el PDF. Intenta nuevamente."
+        pdfAction.textContent = "Generar PDF"
+        return
+      }
+
+      if (data.status === "pending" || data.status === "processing") {
+        statusText.textContent = "Generando PDF en segundo plano. Puedes seguir trabajando."
+        window.setTimeout(consultarPdf, 3000)
+      }
+    }
+
+    consultarPdf()
+  }
+
   const canvas = document.getElementById("canvas")
   if (canvas) {
     const ctx = canvas.getContext("2d")

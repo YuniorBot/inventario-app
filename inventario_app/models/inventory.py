@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.sql import func
 
 from ..extensions import db
+from ..constants import PDF_STATUS_NOT_STARTED
 
 
 class Inmueble(db.Model):
@@ -45,6 +46,15 @@ class Inventario(db.Model):
         default=lambda: str(uuid.uuid4()),
         index=True,
     )
+    pdf_status = db.Column(
+        db.String(20), nullable=False, default=PDF_STATUS_NOT_STARTED, index=True
+    )
+    pdf_filename = db.Column(db.String(255), nullable=True)
+    pdf_error = db.Column(db.Text, nullable=True)
+    pdf_requested_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    pdf_generated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    pdf_version = db.Column(db.Integer, nullable=False, default=0)
+    pdf_job_id = db.Column(db.String(100), nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, server_default=func.now()
     )

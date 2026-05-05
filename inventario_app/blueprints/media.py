@@ -53,7 +53,7 @@ def public_uploaded_file(token, foto_id):
 @login_required
 def generated_pdf(inventario_id):
     inventario = get_inventario_for_current_company_or_404(inventario_id)
-    filename = f"inventario_{inventario.id}.pdf"
+    filename = inventario.pdf_filename or f"inventario_{inventario.id}.pdf"
     if not pdf_file_exists(filename):
         return ("", 404)
     if storage_backend_is_s3():
