@@ -1,8 +1,6 @@
 import uuid
 from pathlib import Path
 
-from werkzeug.utils import secure_filename
-
 from ..constants import ALLOWED_EXTENSIONS
 
 IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
@@ -10,12 +8,14 @@ VIDEO_EXTENSIONS = {"mp4", "mov", "avi", "mkv", "webm"}
 
 
 def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    ext = Path(filename).suffix.lower().lstrip(".")
+    return bool(ext) and ext in ALLOWED_EXTENSIONS
 
 
 def unique_filename(filename: str) -> str:
-    safe = secure_filename(filename)
-    ext = safe.rsplit(".", 1)[1].lower()
+    ext = Path(filename).suffix.lower().lstrip(".")
+    if not ext:
+        raise ValueError("Archivo sin extension valida.")
     return f"{uuid.uuid4().hex}.{ext}"
 
 

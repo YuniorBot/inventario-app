@@ -2,6 +2,7 @@ from flask import Blueprint, abort, redirect, send_from_directory
 from flask_login import login_required
 
 from ..extensions import db
+from ..constants import PDF_STATUS_READY
 from ..models import Foto
 from ..services.access import (
     get_foto_for_current_company_or_404,
@@ -53,7 +54,9 @@ def public_uploaded_file(token, foto_id):
 @login_required
 def generated_pdf(inventario_id):
     inventario = get_inventario_for_current_company_or_404(inventario_id)
-    filename = inventario.pdf_filename or f"inventario_{inventario.id}.pdf"
+    filename = inventario.pdf_filename
+    if inventario.pdf_status != PDF_STATUS_READY or not filename:
+        return ("", 404)
     if not pdf_file_exists(filename):
         return ("", 404)
     if storage_backend_is_s3():

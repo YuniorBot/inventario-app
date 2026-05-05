@@ -41,6 +41,25 @@ def test_upload_accepts_valid_image_file(client, login, seeded_data, app):
         assert Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).count() == 1
 
 
+def test_upload_rejects_hidden_extension_only_filename(client, login, seeded_data, app):
+    login(seeded_data["editor_a"].email)
+
+    response = client.post(
+        f"/subir_foto/{seeded_data['seccion_a'].id}",
+        data={"fotos": (BytesIO(b"fake image content"), ".jpg", "image/jpeg")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Archivo no permitido" in body
+    assert "No se pudo subir ningun archivo valido." in body
+
+    with app.app_context():
+        assert Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).count() == 0
+
+
 def test_uploaded_media_is_served_from_media_route(client, login, seeded_data, app):
     login(seeded_data["editor_a"].email)
 
@@ -138,6 +157,24 @@ def test_generated_pdf_route_requires_login(client, login, seeded_data, app):
     assert authenticated_response.headers["Location"].endswith(
         f"/test-bucket/{get_pdf_object_key(filename)}?expires=300"
     )
+
+
+def test_generated_pdf_route_rejects_stale_pdf(client, login, seeded_data, app):
+    filename = f"inventario_{seeded_data['inventario_a'].id}.pdf"
+    app.extensions["s3_client"].put_object(
+        Bucket=app.config["S3_BUCKET_NAME"],
+        Key=get_pdf_object_key(filename),
+        Body=b"%PDF-1.4\nstale pdf",
+        ContentType="application/pdf",
+    )
+    seeded_data["inventario_a"].pdf_status = "not_started"
+    seeded_data["inventario_a"].pdf_filename = None
+    db.session.commit()
+
+    login(seeded_data["admin_a"].email)
+    response = client.get(f"/media/pdfs/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 404
 
 
 def test_generated_pdf_route_blocks_other_company(client, login, seeded_data, app):
