@@ -79,6 +79,16 @@
       <article class="workflow-step compact-step">
         <strong>Direccion</strong>
         <p>{{ inmueble.direccion }}</p>
+        {% if can_edit %}
+        <form action="/editar_direccion_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div>
+            <label for="direccion-inmueble">Editar dirección</label>
+            <input id="direccion-inmueble" type="text" name="direccion" autocomplete="street-address" value="{{ inmueble.direccion }}" required>
+          </div>
+          <button type="submit" class="button button-secondary">Actualizar dirección</button>
+        </form>
+        {% endif %}
       </article>
       <article class="workflow-step compact-step">
         <strong>Propietario</strong>

@@ -23,6 +23,36 @@ def test_admin_can_create_inmueble(client, login, seeded_data, app):
         assert inmueble.empresa_id == seeded_data["empresa_a"].id
 
 
+def test_admin_can_edit_inmueble_address(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_direccion_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"direccion": "Calle A actualizada"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        assert inmueble.direccion == "Calle A actualizada"
+
+
+def test_empty_inmueble_address_is_rejected(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_direccion_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"direccion": "   "},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        assert inmueble.direccion == "Calle A"
+
+
 def test_admin_can_create_inventory_with_default_sections(
     client, login, seeded_data, app
 ):
