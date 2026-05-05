@@ -7,6 +7,7 @@ from ..services.access import (
     get_inmueble_for_current_company_or_404,
     require_edit_permission,
 )
+from ..services.pdf_queue_service import mark_inventory_pdf_dirty
 
 
 bp = Blueprint("inmuebles", __name__)
@@ -38,6 +39,8 @@ def editar_direccion_inmueble(id):
         return redirect(url_for("inmuebles.ver_inmueble", id=id))
 
     inmueble.direccion = direccion
+    for inventario in inmueble.inventarios:
+        mark_inventory_pdf_dirty(inventario)
     db.session.commit()
     flash("Direccion actualizada.", "success")
     return redirect(url_for("inmuebles.ver_inmueble", id=id))
