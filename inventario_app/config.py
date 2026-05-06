@@ -58,7 +58,11 @@ class Config:
     REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     PDF_QUEUE_NAME = os.environ.get("PDF_QUEUE_NAME", "pdfs")
     PDF_JOB_TIMEOUT_SECONDS = int(os.environ.get("PDF_JOB_TIMEOUT_SECONDS", 900))
+    PDF_STALE_AFTER_SECONDS = int(os.environ.get("PDF_STALE_AFTER_SECONDS", 300))
     PDF_QUEUE_SYNC = os.environ.get("PDF_QUEUE_SYNC", "0") in {"1", "true", "TRUE"}
     PDF_IMAGE_MAX_WIDTH = int(os.environ.get("PDF_IMAGE_MAX_WIDTH", 1200))
     PDF_IMAGE_MAX_HEIGHT = int(os.environ.get("PDF_IMAGE_MAX_HEIGHT", 900))
     PDF_IMAGE_JPEG_QUALITY = int(os.environ.get("PDF_IMAGE_JPEG_QUALITY", 78))
+    UPLOAD_IMAGE_MAX_WIDTH = int(os.environ.get("UPLOAD_IMAGE_MAX_WIDTH", 1600))
+    UPLOAD_IMAGE_MAX_HEIGHT = int(os.environ.get("UPLOAD_IMAGE_MAX_HEIGHT", 1200))
+    UPLOAD_IMAGE_JPEG_QUALITY = int(os.environ.get("UPLOAD_IMAGE_JPEG_QUALITY", 80))

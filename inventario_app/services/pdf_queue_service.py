@@ -18,12 +18,23 @@ from .media_service import get_pdf_file_url, pdf_file_exists
 
 
 def enqueue_inventory_pdf(inventario: Inventario):
+    db.session.refresh(inventario)
     filename = inventario.pdf_filename or f"inventario_{inventario.id}.pdf"
     if inventario.pdf_status == PDF_STATUS_READY and pdf_file_exists(filename):
         return inventario
 
     if inventario.pdf_status in PDF_ACTIVE_STATUSES:
-        return inventario
+        if not _pdf_state_is_stale(inventario):
+            return inventario
+        current_app.logger.warning(
+            "pdf_state_stale inventario_id=%s status=%s job_id=%s",
+            inventario.id,
+            inventario.pdf_status,
+            inventario.pdf_job_id,
+        )
+        inventario.pdf_status = PDF_STATUS_NOT_STARTED
+        inventario.pdf_job_id = None
+        inventario.pdf_error = "La generacion anterior no finalizo a tiempo. Reintentando."
 
     now = datetime.now(timezone.utc)
     inventario.pdf_status = PDF_STATUS_PENDING
@@ -40,15 +51,41 @@ def enqueue_inventory_pdf(inventario: Inventario):
         return inventario
 
     queue = _get_pdf_queue()
-    job = queue.enqueue(
-        "inventario_app.jobs.pdf_jobs.generate_inventory_pdf_job",
-        inventario.id,
-        inventario.pdf_version,
-        job_timeout=current_app.config.get("PDF_JOB_TIMEOUT_SECONDS", 900),
-    )
+    try:
+        job = queue.enqueue(
+            "inventario_app.jobs.pdf_jobs.generate_inventory_pdf_job",
+            inventario.id,
+            inventario.pdf_version,
+            job_timeout=current_app.config.get("PDF_JOB_TIMEOUT_SECONDS", 900),
+        )
+    except Exception:
+        current_app.logger.exception("pdf_enqueue_failed inventario_id=%s", inventario.id)
+        inventario.pdf_status = PDF_STATUS_FAILED
+        inventario.pdf_error = (
+            "No se pudo iniciar la generacion del PDF. Intenta nuevamente."
+        )
+        inventario.pdf_job_id = None
+        db.session.commit()
+        return inventario
+
     inventario.pdf_job_id = job.id
     db.session.commit()
     return inventario
+
+
+def _pdf_state_is_stale(inventario: Inventario) -> bool:
+    if inventario.pdf_status not in PDF_ACTIVE_STATUSES:
+        return False
+    if not inventario.pdf_requested_at:
+        return True
+
+    requested_at = inventario.pdf_requested_at
+    if requested_at.tzinfo is None:
+        requested_at = requested_at.replace(tzinfo=timezone.utc)
+
+    stale_after = current_app.config.get("PDF_STALE_AFTER_SECONDS", 300)
+    elapsed = datetime.now(timezone.utc) - requested_at.astimezone(timezone.utc)
+    return elapsed.total_seconds() >= stale_after
 
 
 def get_pdf_status_payload(inventario: Inventario) -> dict:
