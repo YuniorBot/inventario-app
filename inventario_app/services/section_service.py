@@ -4,7 +4,11 @@ from flask import current_app
 
 from ..extensions import db
 from ..models import Foto, Observacion, Seccion
-from ..services.media_service import delete_uploaded_file, save_uploaded_file
+from ..services.media_service import (
+    MediaProcessingError,
+    delete_uploaded_file,
+    save_uploaded_file,
+)
 from ..services.pdf_queue_service import mark_inventory_pdf_dirty
 from ..utils.files import validate_uploaded_file
 
@@ -43,6 +47,15 @@ def upload_section_files(seccion: Seccion, archivos) -> UploadSectionFilesResult
 
         try:
             nombre_archivo = save_uploaded_file(archivo)
+        except MediaProcessingError as error:
+            current_app.logger.warning(
+                "upload_processing_rejected seccion_id=%s filename=%s reason=%s",
+                seccion.id,
+                archivo.filename,
+                str(error),
+            )
+            errors.append(str(error))
+            continue
         except Exception:
             current_app.logger.exception(
                 "upload_failed seccion_id=%s filename=%s", seccion.id, archivo.filename

@@ -1,8 +1,17 @@
 from io import BytesIO
 
+from PIL import Image
+
 from inventario_app.extensions import db
 from inventario_app.models import Foto
 from inventario_app.services.media_service import get_pdf_object_key, get_upload_object_key
+
+
+def make_image_bytes(format="PNG", size=(40, 30), color=(24, 64, 180)):
+    payload = BytesIO()
+    Image.new("RGB", size, color).save(payload, format=format)
+    payload.seek(0)
+    return payload
 
 
 def test_upload_rejects_mismatched_image_mimetype(client, login, seeded_data, app):
@@ -29,7 +38,7 @@ def test_upload_accepts_valid_image_file(client, login, seeded_data, app):
 
     response = client.post(
         f"/subir_foto/{seeded_data['seccion_a'].id}",
-        data={"fotos": (BytesIO(b"fake png content"), "evidencia.png", "image/png")},
+        data={"fotos": (make_image_bytes("PNG"), "evidencia.png", "image/png")},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -65,7 +74,7 @@ def test_uploaded_media_is_served_from_media_route(client, login, seeded_data, a
 
     client.post(
         f"/subir_foto/{seeded_data['seccion_a'].id}",
-        data={"fotos": (BytesIO(b"fake png content"), "evidencia.png", "image/png")},
+        data={"fotos": (make_image_bytes("PNG"), "evidencia.png", "image/png")},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -79,6 +88,79 @@ def test_uploaded_media_is_served_from_media_route(client, login, seeded_data, a
     assert response.headers["Location"].endswith(
         f"/test-bucket/{get_upload_object_key(foto.archivo)}?expires=300"
     )
+
+
+def test_upload_optimizes_png_to_jpeg_in_s3(client, login, seeded_data, app):
+    login(seeded_data["editor_a"].email)
+
+    response = client.post(
+        f"/subir_foto/{seeded_data['seccion_a'].id}",
+        data={
+            "fotos": (
+                make_image_bytes("PNG", size=(2200, 1800)),
+                "foto-celular.png",
+                "image/png",
+            )
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Se subieron 1 archivo(s)." in response.get_data(as_text=True)
+
+    with app.app_context():
+        foto = Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).one()
+        assert foto.archivo.endswith(".jpg")
+        stored = app.extensions["s3_client"].objects[
+            (app.config["S3_BUCKET_NAME"], get_upload_object_key(foto.archivo))
+        ]
+        assert stored["ContentType"] == "image/jpeg"
+        with Image.open(BytesIO(stored["Body"])) as optimized:
+            assert optimized.format == "JPEG"
+            assert optimized.width <= 1600
+            assert optimized.height <= 1200
+
+
+def test_upload_keeps_video_extension_without_optimization(client, login, seeded_data, app):
+    login(seeded_data["editor_a"].email)
+
+    response = client.post(
+        f"/subir_foto/{seeded_data['seccion_a'].id}",
+        data={"fotos": (BytesIO(b"video bytes"), "recorrido.mp4", "video/mp4")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Se subieron 1 archivo(s)." in response.get_data(as_text=True)
+
+    with app.app_context():
+        foto = Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).one()
+        assert foto.archivo.endswith(".mp4")
+        stored = app.extensions["s3_client"].objects[
+            (app.config["S3_BUCKET_NAME"], get_upload_object_key(foto.archivo))
+        ]
+        assert stored["ContentType"] == "video/mp4"
+
+
+def test_upload_rejects_corrupt_image_payload(client, login, seeded_data, app):
+    login(seeded_data["editor_a"].email)
+
+    response = client.post(
+        f"/subir_foto/{seeded_data['seccion_a'].id}",
+        data={"fotos": (BytesIO(b"not an image"), "foto.jpg", "image/jpeg")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "archivo invalido o corrupto" in body
+    assert "No se pudo subir ningun archivo valido." in body
+
+    with app.app_context():
+        assert Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).count() == 0
 
 
 def test_uploaded_media_requires_company_access(client, login, seeded_data, app):

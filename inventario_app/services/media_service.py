@@ -1,11 +1,20 @@
+from io import BytesIO
 from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
 from flask import current_app, url_for
+from PIL import Image as PILImage, ImageOps, UnidentifiedImageError
 
 from ..config import PDF_DIR, UPLOAD_DIR
 from ..utils.files import unique_filename
+
+
+OPTIMIZABLE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+
+
+class MediaProcessingError(Exception):
+    pass
 
 
 def storage_backend_is_s3() -> bool:
@@ -71,6 +80,22 @@ def ensure_storage_dirs() -> None:
 
 
 def save_uploaded_file(storage) -> str:
+    optimized_payload = _optimize_uploaded_image(storage)
+    if optimized_payload is not None:
+        filename = unique_filename("optimized.jpg")
+        payload = optimized_payload.getvalue()
+        if storage_backend_is_s3():
+            get_s3_client().upload_fileobj(
+                BytesIO(payload),
+                get_s3_bucket_name(),
+                get_upload_object_key(filename),
+                ExtraArgs={"ContentType": "image/jpeg"},
+            )
+            return filename
+
+        get_uploaded_file_path(filename).write_bytes(payload)
+        return filename
+
     filename = unique_filename(storage.filename)
     if storage_backend_is_s3():
         storage.stream.seek(0)
@@ -84,6 +109,41 @@ def save_uploaded_file(storage) -> str:
 
     storage.save(get_upload_dir() / filename)
     return filename
+
+
+def _optimize_uploaded_image(storage) -> BytesIO | None:
+    ext = Path(storage.filename or "").suffix.lower().lstrip(".")
+    if ext not in OPTIMIZABLE_IMAGE_EXTENSIONS:
+        return None
+
+    try:
+        storage.stream.seek(0)
+        with PILImage.open(storage.stream) as source:
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail(
+                (
+                    current_app.config.get("UPLOAD_IMAGE_MAX_WIDTH", 1600),
+                    current_app.config.get("UPLOAD_IMAGE_MAX_HEIGHT", 1200),
+                )
+            )
+            if image.mode not in {"RGB", "L"}:
+                image = image.convert("RGB")
+
+            output = BytesIO()
+            image.save(
+                output,
+                format="JPEG",
+                optimize=True,
+                quality=current_app.config.get("UPLOAD_IMAGE_JPEG_QUALITY", 80),
+            )
+            output.seek(0)
+            return output
+    except (UnidentifiedImageError, OSError, ValueError) as error:
+        raise MediaProcessingError(
+            "No se pudo procesar la imagen: archivo invalido o corrupto."
+        ) from error
+    finally:
+        storage.stream.seek(0)
 
 
 def delete_uploaded_file(filename: str) -> None:

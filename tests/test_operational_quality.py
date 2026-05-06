@@ -1,10 +1,38 @@
 from io import BytesIO
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
+from inventario_app.constants import (
+    PDF_STATUS_FAILED,
+    PDF_STATUS_PENDING,
+    PDF_STATUS_PROCESSING,
+)
 from inventario_app.extensions import db
-from inventario_app.models import Firma, Foto, Inmueble, Observacion, Seccion
+from inventario_app.models import Firma, Foto, Inmueble, Inventario, Observacion, Seccion
 from inventario_app.services.media_service import get_upload_object_key
 from inventario_app.services import pdf_service
+
+
+class FailingPdfQueue:
+    def enqueue(self, *_args, **_kwargs):
+        raise RuntimeError("redis down")
+
+
+class RecordingPdfQueue:
+    def __init__(self):
+        self.calls = []
+
+    def enqueue(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        return SimpleNamespace(id=f"job-{len(self.calls)}")
+
+
+def _force_async_pdf_queue(app):
+    app.config["TESTING"] = False
+    app.config["PDF_QUEUE_SYNC"] = False
 
 
 def test_dashboard_paginates_large_property_list(
@@ -49,6 +77,123 @@ def test_pdf_generation_failure_returns_message(client, login, seeded_data):
     assert "No se pudo generar el PDF en este momento." in response.get_data(
         as_text=True
     )
+
+
+def test_pdf_enqueue_failure_marks_failed(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+    _force_async_pdf_queue(app)
+
+    with patch(
+        "inventario_app.services.pdf_queue_service._get_pdf_queue",
+        return_value=FailingPdfQueue(),
+    ):
+        response = client.get(
+            f"/inventario_pdf/{seeded_data['inventario_a'].id}", follow_redirects=True
+        )
+
+    assert response.status_code == 200
+    assert "No se pudo generar el PDF en este momento." in response.get_data(
+        as_text=True
+    )
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.pdf_status == PDF_STATUS_FAILED
+        assert "No se pudo iniciar" in inventario.pdf_error
+        assert inventario.pdf_job_id is None
+
+
+def test_failed_pdf_can_be_retried(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+    _force_async_pdf_queue(app)
+    queue = RecordingPdfQueue()
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        inventario.pdf_status = PDF_STATUS_FAILED
+        inventario.pdf_error = "Fallo anterior"
+        db.session.commit()
+        db.session.remove()
+
+    with patch(
+        "inventario_app.services.pdf_queue_service._get_pdf_queue",
+        return_value=queue,
+    ):
+        response = client.get(f"/inventario_pdf/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 302
+    assert len(queue.calls) == 1
+
+    with app.app_context():
+        db.session.expire_all()
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.pdf_status == PDF_STATUS_PENDING
+        assert inventario.pdf_error is None
+        assert inventario.pdf_job_id == "job-1"
+
+
+def test_fresh_pending_pdf_is_not_duplicated(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+    _force_async_pdf_queue(app)
+    queue = RecordingPdfQueue()
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        inventario.pdf_status = PDF_STATUS_PENDING
+        inventario.pdf_requested_at = datetime.now(timezone.utc)
+        inventario.pdf_job_id = "existing-job"
+        db.session.commit()
+        db.session.remove()
+
+    with patch(
+        "inventario_app.services.pdf_queue_service._get_pdf_queue",
+        return_value=queue,
+    ):
+        response = client.get(f"/inventario_pdf/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 302
+    assert queue.calls == []
+
+    with app.app_context():
+        db.session.expire_all()
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.pdf_status == PDF_STATUS_PENDING
+        assert inventario.pdf_job_id == "existing-job"
+
+
+@pytest.mark.parametrize("stale_status", [PDF_STATUS_PENDING, PDF_STATUS_PROCESSING])
+def test_stale_active_pdf_can_be_retried(
+    client, login, seeded_data, app, stale_status
+):
+    login(seeded_data["admin_a"].email)
+    _force_async_pdf_queue(app)
+    queue = RecordingPdfQueue()
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        inventario.pdf_status = stale_status
+        inventario.pdf_requested_at = datetime.now(timezone.utc) - timedelta(
+            seconds=301
+        )
+        inventario.pdf_job_id = "stale-job"
+        db.session.commit()
+        db.session.remove()
+
+    with patch(
+        "inventario_app.services.pdf_queue_service._get_pdf_queue",
+        return_value=queue,
+    ):
+        response = client.get(f"/inventario_pdf/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 302
+    assert len(queue.calls) == 1
+
+    with app.app_context():
+        db.session.expire_all()
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.pdf_status == PDF_STATUS_PENDING
+        assert inventario.pdf_error is None
+        assert inventario.pdf_job_id == "job-1"
 
 
 def test_signature_rejects_non_image_payload(client, login, seeded_data, app):

@@ -9,6 +9,7 @@ from flask import (
 )
 from flask_login import login_required
 
+from ..constants import PDF_STATUS_FAILED, PDF_STATUS_READY
 from ..models import Inventario
 from ..services.access import (
     get_inmueble_for_current_company_or_404,
@@ -83,11 +84,11 @@ def guardar_firma(id):
 def inventario_pdf(id):
     inventario = get_inventario_for_current_company_or_404(id)
     inventario = enqueue_inventory_pdf(inventario)
-    if inventario.pdf_status == "failed":
+    if inventario.pdf_status == PDF_STATUS_FAILED:
         flash("No se pudo generar el PDF en este momento.", "error")
         return redirect(url_for("inventarios.ver_inventario", id=id))
 
-    if inventario.pdf_status == "ready":
+    if inventario.pdf_status == PDF_STATUS_READY:
         return redirect(get_pdf_file_url(inventario.id))
 
     flash(
