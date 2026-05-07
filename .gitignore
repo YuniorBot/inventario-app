@@ -15,4 +15,8 @@ instance/storage/
 flask.log
 server.out.log
 server.err.log
+
 instance/app.log
+
+instance/*.log
+
