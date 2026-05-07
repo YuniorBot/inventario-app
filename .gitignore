@@ -11,6 +11,9 @@ skills-lock.json
 inventario.db
 instance/*.db
 instance/storage/
+static/uploads/
+static/*.pdf
+static/firma_*.png
 
 flask.log
 server.out.log
