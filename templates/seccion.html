@@ -46,14 +46,15 @@
     <h3>Subir fotos o videos</h3>
     <p class="muted">Selecciona varios archivos desde computador o captura rapida en movil para documentar el estado del ambiente.</p>
 
-    <form action="/subir_foto/{{ seccion.id }}" method="POST" enctype="multipart/form-data" class="stack">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form action="/subir_foto/{{ seccion.id }}" method="POST" enctype="multipart/form-data" class="stack" id="upload-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="upload-csrf-token">
       <div>
         <label for="fotos">Archivos</label>
         <input id="fotos" type="file" name="fotos" multiple accept="image/*,video/*">
       </div>
+      <p class="muted" id="upload-status" aria-live="polite"></p>
       <div class="inline-actions">
-        <button type="submit">Subir archivos</button>
+        <button type="submit" id="upload-submit-button">Subir archivos</button>
       </div>
     </form>
   </article>
@@ -206,4 +207,74 @@
 
 {% block scripts %}
 <script src="/static/gallery-viewer.js"></script>
+{% if can_edit %}
+<script>
+  ;(() => {
+    const form = document.getElementById("upload-form")
+    const fileInput = document.getElementById("fotos")
+    const submitButton = document.getElementById("upload-submit-button")
+    const status = document.getElementById("upload-status")
+    const csrfToken = document.getElementById("upload-csrf-token")
+    let uploadInProgress = false
+
+    if (!form || !fileInput || !submitButton || !status || !csrfToken) {
+      return
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault()
+
+      if (uploadInProgress) {
+        return
+      }
+
+      const files = Array.from(fileInput.files || [])
+      if (!files.length) {
+        status.textContent = "Selecciona al menos un archivo para subir."
+        return
+      }
+
+      uploadInProgress = true
+      submitButton.disabled = true
+      fileInput.disabled = true
+      submitButton.textContent = "Subiendo..."
+
+      let uploadedCount = 0
+      let failedCount = 0
+
+      for (const [index, file] of files.entries()) {
+        status.textContent = `Subiendo archivo ${index + 1} de ${files.length}: ${file.name}`
+
+        const payload = new FormData()
+        payload.append("csrf_token", csrfToken.value)
+        payload.append("fotos", file, file.name)
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: payload,
+            credentials: "same-origin",
+          })
+
+          if (response.ok) {
+            uploadedCount += 1
+          } else {
+            failedCount += 1
+          }
+        } catch (_error) {
+          failedCount += 1
+        }
+      }
+
+      status.textContent = failedCount
+        ? `Subidos ${uploadedCount} de ${files.length} archivo(s). ${failedCount} fallaron.`
+        : `Subidos ${uploadedCount} archivo(s). Actualizando galeria...`
+
+      window.setTimeout(() => {
+        window.location.reload()
+      }, failedCount ? 1500 : 300)
+    })
+  })()
+</script>
+{% endif %}
 {% endblock %}
