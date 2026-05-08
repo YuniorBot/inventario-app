@@ -1,5 +1,6 @@
 from io import BytesIO
 from pathlib import Path
+import shutil
 
 import boto3
 from botocore.exceptions import ClientError
@@ -177,6 +178,20 @@ def upload_pdf_bytes(filename: str, payload: bytes) -> None:
         return
 
     get_pdf_file_path(filename).write_bytes(payload)
+
+
+def upload_pdf_file(filename: str, source_path: Path) -> None:
+    if storage_backend_is_s3():
+        with source_path.open("rb") as fileobj:
+            get_s3_client().upload_fileobj(
+                fileobj,
+                get_s3_bucket_name(),
+                get_pdf_object_key(filename),
+                ExtraArgs={"ContentType": "application/pdf"},
+            )
+        return
+
+    shutil.copyfile(source_path, get_pdf_file_path(filename))
 
 
 def _object_exists(object_key: str) -> bool:

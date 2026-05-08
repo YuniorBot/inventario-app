@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from PIL import Image as PILImage
 
 from inventario_app.constants import (
     PDF_STATUS_FAILED,
@@ -12,7 +13,7 @@ from inventario_app.constants import (
 )
 from inventario_app.extensions import db
 from inventario_app.models import Firma, Foto, Inmueble, Inventario, Observacion, Seccion
-from inventario_app.services.media_service import get_upload_object_key
+from inventario_app.services.media_service import get_pdf_object_key, get_upload_object_key
 from inventario_app.services import pdf_service
 
 
@@ -344,11 +345,13 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
     captured = []
 
     class FakeDoc:
-        def __init__(self, *args, **kwargs):
-            pass
+        def __init__(self, filename, *args, **kwargs):
+            self.filename = filename
 
         def build(self, elementos, **kwargs):
             captured.extend(elementos)
+            with open(self.filename, "wb") as pdf_file:
+                pdf_file.write(b"%PDF-1.4\n")
 
     class FakeImage:
         def __init__(self, source):
@@ -379,7 +382,9 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
             patch.object(pdf_service, "Spacer", lambda *_args: "SPACER"),
             patch.object(pdf_service, "Image", FakeImage),
             patch.object(
-                pdf_service, "_prepare_pdf_image", lambda _payload: BytesIO(b"image")
+                pdf_service,
+                "_prepare_pdf_image_file",
+                lambda _payload, _output_path: True,
             ),
             patch.object(
                 pdf_service,
@@ -404,11 +409,13 @@ def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
     captured = []
 
     class FakeDoc:
-        def __init__(self, *args, **kwargs):
-            pass
+        def __init__(self, filename, *args, **kwargs):
+            self.filename = filename
 
         def build(self, elementos, **kwargs):
             captured.extend(elementos)
+            with open(self.filename, "wb") as pdf_file:
+                pdf_file.write(b"%PDF-1.4\n")
 
     with app.app_context():
         firma = Firma(
@@ -436,6 +443,36 @@ def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
     assert "<b>Cédula:</b> 1234567890" in captured
     assert "<b>Celular:</b> 3001234567" in captured
     assert "<b>Correo electrónico:</b> laura@example.com" in captured
+
+
+def test_pdf_generation_handles_many_images(app, seeded_data):
+    payload = BytesIO()
+    PILImage.new("RGB", (40, 30), (24, 64, 180)).save(payload, format="JPEG")
+    image_bytes = payload.getvalue()
+
+    with app.app_context():
+        seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
+        for index in range(120):
+            filename = f"masiva-{index}.jpg"
+            db.session.add(Foto(seccion_id=seccion.id, archivo=filename))
+            app.extensions["s3_client"].put_object(
+                Bucket=app.config["S3_BUCKET_NAME"],
+                Key=get_upload_object_key(filename),
+                Body=image_bytes,
+                ContentType="image/jpeg",
+            )
+        db.session.commit()
+
+        filename = pdf_service.build_inventory_pdf(
+            seeded_data["inventario_a"],
+            [seccion],
+            [],
+        )
+
+    assert (
+        app.config["S3_BUCKET_NAME"],
+        get_pdf_object_key(filename),
+    ) in app.extensions["s3_client"].objects
 
 
 def test_public_view_shows_section_description(client, login, seeded_data):
