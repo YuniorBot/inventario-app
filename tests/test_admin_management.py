@@ -81,6 +81,48 @@ def test_superadmin_status_change_clears_company_mode(
         assert "superadmin_company_id" not in session
 
 
+def test_superadmin_can_reset_primary_admin_password(
+    client, login, seeded_data, app, make_company, make_user
+):
+    superadmin = make_superadmin(app, make_company, make_user)
+    login(superadmin["email"])
+
+    response = client.post(
+        f"/superadmin/empresas/{seeded_data['empresa_a'].id}/admin-password",
+        data={"password": "temporal-nueva-123"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        admin = db.session.get(Usuario, seeded_data["admin_a"].id)
+        assert check_password_hash(admin.password, "temporal-nueva-123")
+
+
+def test_superadmin_cannot_reset_primary_admin_password_with_short_password(
+    client, login, seeded_data, app, make_company, make_user
+):
+    superadmin = make_superadmin(app, make_company, make_user)
+    login(superadmin["email"])
+
+    with app.app_context():
+        original_hash = db.session.get(Usuario, seeded_data["admin_a"].id).password
+
+    response = client.post(
+        f"/superadmin/empresas/{seeded_data['empresa_a'].id}/admin-password",
+        data={"password": "123"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "La nueva contrasena debe tener al menos 6 caracteres" in response.get_data(
+        as_text=True
+    )
+    with app.app_context():
+        admin = db.session.get(Usuario, seeded_data["admin_a"].id)
+        assert admin.password == original_hash
+
+
 def test_superadmin_can_enter_and_exit_company_mode(
     client, login, seeded_data, app, make_company, make_user
 ):
