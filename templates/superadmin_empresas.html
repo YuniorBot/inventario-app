@@ -128,6 +128,19 @@
         Admin principal: {{ admin_principal.nombre if admin_principal else 'Sin admin' }}
       </p>
 
+      {% if admin_principal %}
+      <form action="/superadmin/empresas/{{ empresa.id }}/admin-password" method="POST" class="stack user-role-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label for="admin-password-{{ empresa.id }}">Nueva contrasena temporal</label>
+          <input id="admin-password-{{ empresa.id }}" type="password" name="password" autocomplete="new-password" placeholder="Minimo 6 caracteres..." minlength="6" required>
+        </div>
+        <div class="inline-actions">
+          <button type="submit">Restablecer contrasena admin</button>
+        </div>
+      </form>
+      {% endif %}
+
       <form action="/superadmin/empresas/{{ empresa.id }}/estado" method="POST" class="stack user-role-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>

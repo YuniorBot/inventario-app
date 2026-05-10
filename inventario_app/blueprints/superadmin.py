@@ -19,6 +19,7 @@ from ..services.access import require_superadmin_permission
 from ..services.superadmin_service import (
     create_company_with_primary_admin,
     list_managed_companies,
+    reset_company_admin_password,
     update_company_status,
 )
 
@@ -76,6 +77,27 @@ def superadmin_actualizar_estado_empresa(id):
         session.pop("superadmin_company_id", None)
 
     flash("Estado de la empresa actualizado correctamente.", "success")
+    return redirect(url_for("superadmin.superadmin_empresas"))
+
+
+@bp.route(
+    "/superadmin/empresas/<int:id>/admin-password",
+    methods=["POST"],
+    endpoint="superadmin_actualizar_password_admin",
+)
+@login_required
+def superadmin_actualizar_password_admin(id):
+    require_superadmin_permission()
+    empresa = db.session.get(Empresa, id)
+    if not empresa:
+        abort(404)
+
+    result = reset_company_admin_password(empresa, request.form.get("password", ""))
+    if not result.is_valid:
+        flash(result.error_message, "error")
+        return redirect(url_for("superadmin.superadmin_empresas"))
+
+    flash("Contrasena del admin restablecida correctamente.", "success")
     return redirect(url_for("superadmin.superadmin_empresas"))
 
 

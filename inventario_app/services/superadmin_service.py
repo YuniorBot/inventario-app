@@ -83,3 +83,18 @@ def update_company_status(empresa: Empresa, estado: str) -> ServiceResult:
     empresa.activo = estado != STATUS_CANCELLED
     db.session.commit()
     return ServiceResult(True)
+
+
+def reset_company_admin_password(empresa: Empresa, password_raw: str) -> ServiceResult:
+    if len(password_raw) < 6:
+        return ServiceResult(
+            False, "La nueva contrasena debe tener al menos 6 caracteres."
+        )
+
+    admin = Usuario.query.filter_by(empresa_id=empresa.id, rol=ROLE_ADMIN).first()
+    if not admin:
+        return ServiceResult(False, "La empresa no tiene admin principal configurado.")
+
+    admin.password = generate_password_hash(password_raw)
+    db.session.commit()
+    return ServiceResult(True)
