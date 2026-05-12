@@ -24,6 +24,17 @@ def test_viewer_cannot_edit_inmueble_address(client, login, seeded_data):
     assert response.status_code == 403
 
 
+def test_viewer_cannot_edit_inmueble_owner(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    response = client.post(
+        f"/editar_propietario_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"propietario": "Cambio no permitido"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_editor_cannot_open_user_admin_panel(client, login, seeded_data):
     login(seeded_data["editor_a"].email)
 
@@ -46,6 +57,17 @@ def test_admin_cannot_edit_other_company_inmueble_address(client, login, seeded_
     response = client.post(
         f"/editar_direccion_inmueble/{seeded_data['inmueble_b'].id}",
         data={"direccion": "Cambio cruzado"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_edit_other_company_inmueble_owner(client, login, seeded_data):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_propietario_inmueble/{seeded_data['inmueble_b'].id}",
+        data={"propietario": "Cambio cruzado"},
     )
 
     assert response.status_code == 403

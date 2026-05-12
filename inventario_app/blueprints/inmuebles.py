@@ -44,3 +44,26 @@ def editar_direccion_inmueble(id):
     db.session.commit()
     flash("Direccion actualizada.", "success")
     return redirect(url_for("inmuebles.ver_inmueble", id=id))
+
+
+@bp.route(
+    "/editar_propietario_inmueble/<int:id>",
+    methods=["POST"],
+    endpoint="editar_propietario_inmueble",
+)
+@login_required
+def editar_propietario_inmueble(id):
+    require_edit_permission()
+    inmueble = get_inmueble_for_current_company_or_404(id)
+    propietario = request.form.get("propietario", "").strip()
+
+    if not propietario:
+        flash("El propietario no puede estar vacio.", "error")
+        return redirect(url_for("inmuebles.ver_inmueble", id=id))
+
+    inmueble.propietario = propietario
+    for inventario in inmueble.inventarios:
+        mark_inventory_pdf_dirty(inventario)
+    db.session.commit()
+    flash("Propietario actualizado.", "success")
+    return redirect(url_for("inmuebles.ver_inmueble", id=id))

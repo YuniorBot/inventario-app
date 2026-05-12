@@ -4,8 +4,6 @@ from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from flask import current_app
-from PIL import Image as PILImage, ImageOps, UnidentifiedImageError
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -16,12 +14,8 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
     Spacer,
-    Table,
-    TableStyle,
 )
-from .media_service import get_uploaded_file_bytes, upload_pdf_file
-
-PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+from .media_service import upload_pdf_file
 
 
 def build_inventory_pdf(inventario, secciones, firmas) -> str:
@@ -92,7 +86,6 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
 
     with TemporaryDirectory(prefix=f"inventario_pdf_{inventario.id}_") as temp_dir:
         temp_path = Path(temp_dir)
-        image_index = 0
         elementos = [
             Paragraph("Inventario de Entrega de Inmueble", title_style),
             Paragraph("Resumen general del recorrido documentado.", note_style),
@@ -114,40 +107,13 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
                 )
             )
 
-            tiene_evidencia = False
-            fila_galeria = []
-            for foto in seccion.fotos:
-                ext = foto.archivo.rsplit(".", 1)[-1].lower()
-                if ext not in PDF_IMAGE_EXTENSIONS:
-                    continue
-
-                archivo_bytes = get_uploaded_file_bytes(foto.archivo)
-                if not archivo_bytes:
-                    continue
-
-                image_index += 1
-                imagen_path = temp_path / f"pdf_image_{image_index}.jpg"
-                if not _prepare_pdf_image_file(archivo_bytes, imagen_path):
-                    current_app.logger.warning(
-                        "pdf_image_skipped inventario_id=%s archivo=%s",
-                        inventario.id,
-                        foto.archivo,
+            if seccion.fotos:
+                elementos.append(
+                    Paragraph(
+                        f"Evidencia multimedia registrada: {len(seccion.fotos)} archivo(s). No incluida en el PDF.",
+                        note_style,
                     )
-                    continue
-
-                tiene_evidencia = True
-                imagen = Image(str(imagen_path))
-                imagen._restrictSize(2.6 * inch, 2.1 * inch)
-                fila_galeria.append(imagen)
-
-                if len(fila_galeria) == 2:
-                    _append_gallery(elementos, fila_galeria)
-                    fila_galeria = []
-
-            if fila_galeria:
-                _append_gallery(elementos, fila_galeria)
-
-            if tiene_evidencia:
+                )
                 elementos.append(Spacer(1, 4))
             else:
                 elementos.append(Paragraph("Sin evidencia multimedia cargada.", note_style))
@@ -217,76 +183,6 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
         )
         upload_pdf_file(nombre_pdf, pdf_path)
     return nombre_pdf
-
-
-def _append_gallery(elementos, galeria) -> None:
-    filas = [galeria[index : index + 2] for index in range(0, len(galeria), 2)]
-    for fila in filas:
-        if len(fila) == 1:
-            fila.append(Spacer(1, 1))
-    tabla_galeria = Table(filas, colWidths=[2.75 * inch, 2.75 * inch], hAlign="LEFT")
-    tabla_galeria.setStyle(
-        TableStyle(
-            [
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]
-        )
-    )
-    elementos.append(tabla_galeria)
-
-
-def _prepare_pdf_image(payload: bytes) -> BytesIO | None:
-    try:
-        with PILImage.open(BytesIO(payload)) as source:
-            image = ImageOps.exif_transpose(source)
-            image.thumbnail(
-                (
-                    current_app.config.get("PDF_IMAGE_MAX_WIDTH", 1200),
-                    current_app.config.get("PDF_IMAGE_MAX_HEIGHT", 900),
-                )
-            )
-            if image.mode not in {"RGB", "L"}:
-                image = image.convert("RGB")
-
-            output = BytesIO()
-            image.save(
-                output,
-                format="JPEG",
-                optimize=True,
-                quality=current_app.config.get("PDF_IMAGE_JPEG_QUALITY", 78),
-            )
-            output.seek(0)
-            return output
-    except (UnidentifiedImageError, OSError, ValueError):
-        return None
-
-
-def _prepare_pdf_image_file(payload: bytes, output_path: Path) -> bool:
-    try:
-        with PILImage.open(BytesIO(payload)) as source:
-            image = ImageOps.exif_transpose(source)
-            image.thumbnail(
-                (
-                    current_app.config.get("PDF_IMAGE_MAX_WIDTH", 1200),
-                    current_app.config.get("PDF_IMAGE_MAX_HEIGHT", 900),
-                )
-            )
-            if image.mode not in {"RGB", "L"}:
-                image = image.convert("RGB")
-
-            image.save(
-                output_path,
-                format="JPEG",
-                optimize=True,
-                quality=current_app.config.get("PDF_IMAGE_JPEG_QUALITY", 78),
-            )
-            return True
-    except (UnidentifiedImageError, OSError, ValueError):
-        return False
 
 
 def _safe_text(value) -> str:

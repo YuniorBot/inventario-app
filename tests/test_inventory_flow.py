@@ -46,6 +46,29 @@ def test_admin_can_edit_inmueble_address(client, login, seeded_data, app):
         assert inventario.pdf_filename is None
 
 
+def test_admin_can_edit_inmueble_owner(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        seeded_data["inventario_a"].pdf_status = "ready"
+        seeded_data["inventario_a"].pdf_filename = "inventario_1.pdf"
+        db.session.commit()
+
+    response = client.post(
+        f"/editar_propietario_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"propietario": "Nuevo propietario"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inmueble.propietario == "Nuevo propietario"
+        assert inventario.pdf_status == "not_started"
+        assert inventario.pdf_filename is None
+
+
 def test_empty_inmueble_address_is_rejected(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 
@@ -59,6 +82,21 @@ def test_empty_inmueble_address_is_rejected(client, login, seeded_data, app):
     with app.app_context():
         inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
         assert inmueble.direccion == "Calle A"
+
+
+def test_empty_inmueble_owner_is_rejected(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_propietario_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"propietario": "   "},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        assert inmueble.propietario == "Owner"
 
 
 def test_admin_can_create_inventory_with_default_sections(

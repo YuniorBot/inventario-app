@@ -1,10 +1,8 @@
-from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from PIL import Image as PILImage
 
 from inventario_app.constants import (
     PDF_STATUS_FAILED,
@@ -13,7 +11,7 @@ from inventario_app.constants import (
 )
 from inventario_app.extensions import db
 from inventario_app.models import Firma, Foto, Inmueble, Inventario, Observacion, Seccion
-from inventario_app.services.media_service import get_pdf_object_key, get_upload_object_key
+from inventario_app.services.media_service import get_pdf_object_key
 from inventario_app.services import pdf_service
 
 
@@ -341,7 +339,9 @@ def test_pdf_only_uses_sections_with_description(client, login, seeded_data, app
     ]
 
 
-def test_pdf_places_description_between_media_and_observations(app, seeded_data):
+def test_pdf_places_description_between_media_summary_and_observations(
+    app, seeded_data
+):
     captured = []
 
     class FakeDoc:
@@ -353,13 +353,6 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
             with open(self.filename, "wb") as pdf_file:
                 pdf_file.write(b"%PDF-1.4\n")
 
-    class FakeImage:
-        def __init__(self, source):
-            self.source = source
-
-        def _restrictSize(self, *_args):
-            return None
-
     with app.app_context():
         seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
         seccion.descripcion = "Descripcion visible"
@@ -369,28 +362,10 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
         db.session.add(Foto(seccion_id=seccion.id, archivo="orden.jpg"))
         db.session.commit()
 
-        app.extensions["s3_client"].put_object(
-            Bucket=app.config["S3_BUCKET_NAME"],
-            Key=get_upload_object_key("orden.jpg"),
-            Body=b"fake image bytes",
-            ContentType="image/jpeg",
-        )
-
         with (
             patch.object(pdf_service, "SimpleDocTemplate", FakeDoc),
             patch.object(pdf_service, "Paragraph", lambda text, _style: text),
             patch.object(pdf_service, "Spacer", lambda *_args: "SPACER"),
-            patch.object(pdf_service, "Image", FakeImage),
-            patch.object(
-                pdf_service,
-                "_prepare_pdf_image_file",
-                lambda _payload, _output_path: True,
-            ),
-            patch.object(
-                pdf_service,
-                "_append_gallery",
-                lambda elementos, _galeria: elementos.append("GALERIA"),
-            ),
         ):
             pdf_service.build_inventory_pdf(
                 seeded_data["inventario_a"],
@@ -398,11 +373,13 @@ def test_pdf_places_description_between_media_and_observations(app, seeded_data)
                 [],
             )
 
-    gallery_index = captured.index("GALERIA")
+    media_index = captured.index(
+        "Evidencia multimedia registrada: 1 archivo(s). No incluida en el PDF."
+    )
     descripcion_index = captured.index("<b>Descripcion:</b> Descripcion visible")
     observacion_index = captured.index("<b>Observacion:</b> Observacion visible")
 
-    assert gallery_index < descripcion_index < observacion_index
+    assert media_index < descripcion_index < observacion_index
 
 
 def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
@@ -445,34 +422,46 @@ def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
     assert "<b>Correo electrónico:</b> laura@example.com" in captured
 
 
-def test_pdf_generation_handles_many_images(app, seeded_data):
-    payload = BytesIO()
-    PILImage.new("RGB", (40, 30), (24, 64, 180)).save(payload, format="JPEG")
-    image_bytes = payload.getvalue()
+def test_pdf_generation_summarizes_media_without_embedding_images(app, seeded_data):
+    captured = []
+
+    class FakeDoc:
+        def __init__(self, filename, *args, **kwargs):
+            self.filename = filename
+
+        def build(self, elementos, **kwargs):
+            captured.extend(elementos)
+            with open(self.filename, "wb") as pdf_file:
+                pdf_file.write(b"%PDF-1.4\n")
 
     with app.app_context():
         seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
         for index in range(120):
             filename = f"masiva-{index}.jpg"
             db.session.add(Foto(seccion_id=seccion.id, archivo=filename))
-            app.extensions["s3_client"].put_object(
-                Bucket=app.config["S3_BUCKET_NAME"],
-                Key=get_upload_object_key(filename),
-                Body=image_bytes,
-                ContentType="image/jpeg",
-            )
         db.session.commit()
 
-        filename = pdf_service.build_inventory_pdf(
-            seeded_data["inventario_a"],
-            [seccion],
-            [],
-        )
+        with (
+            patch.object(pdf_service, "SimpleDocTemplate", FakeDoc),
+            patch.object(pdf_service, "Paragraph", lambda text, _style: text),
+            patch.object(pdf_service, "Spacer", lambda *_args: "SPACER"),
+            patch.object(pdf_service, "Image") as image,
+        ):
+            filename = pdf_service.build_inventory_pdf(
+                seeded_data["inventario_a"],
+                [seccion],
+                [],
+            )
 
     assert (
         app.config["S3_BUCKET_NAME"],
         get_pdf_object_key(filename),
     ) in app.extensions["s3_client"].objects
+    assert (
+        "Evidencia multimedia registrada: 120 archivo(s). No incluida en el PDF."
+        in captured
+    )
+    image.assert_not_called()
 
 
 def test_public_view_shows_section_description(client, login, seeded_data):

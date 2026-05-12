@@ -93,6 +93,16 @@
       <article class="workflow-step compact-step">
         <strong>Propietario</strong>
         <p>{{ inmueble.propietario }}</p>
+        {% if can_edit %}
+        <form action="/editar_propietario_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div>
+            <label for="propietario-inmueble">Editar propietario</label>
+            <input id="propietario-inmueble" type="text" name="propietario" autocomplete="name" value="{{ inmueble.propietario }}" required>
+          </div>
+          <button type="submit" class="button button-secondary">Actualizar propietario</button>
+        </form>
+        {% endif %}
       </article>
       <article class="workflow-step compact-step">
         <strong>Fecha de recepcion</strong>
