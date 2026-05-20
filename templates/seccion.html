@@ -46,7 +46,7 @@
     <h3>Subir fotos o videos</h3>
     <p class="muted">Selecciona varios archivos desde computador o captura rapida en movil para documentar el estado del ambiente.</p>
 
-    <form action="/subir_foto/{{ seccion.id }}" method="POST" enctype="multipart/form-data" class="stack" id="upload-form">
+    <form action="/subir_foto/{{ seccion.id }}" method="POST" enctype="multipart/form-data" class="stack" id="upload-form" data-video-presign-url="{{ url_for('secciones.presign_video_upload', id=seccion.id) }}" data-video-complete-url="{{ url_for('secciones.complete_video_upload', id=seccion.id) }}" data-video-max-size="{{ video_max_upload_bytes }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="upload-csrf-token">
       <div>
         <label for="fotos">Archivos</label>
@@ -91,6 +91,7 @@
     {% for foto in fotos %}
     <article class="media-card fade-in delay-1">
       {% if is_video_file(foto.archivo) %}
+      {% if foto.processing_status in ['ready', 'processed'] %}
       <button
         type="button"
         class="gallery-link gallery-link-button"
@@ -105,6 +106,12 @@
           <source src="{{ uploaded_file_url(foto.id) }}">
         </video>
       </button>
+      {% else %}
+      <div class="gallery-link media-processing-card">
+        <span class="chip media-chip">Video {{ 'fallo' if foto.processing_status == 'failed' else 'en procesamiento' }}</span>
+        <p class="muted">{{ foto.processing_error or 'El video ya se subio y estara disponible cuando finalice la compresion.' }}</p>
+      </div>
+      {% endif %}
       {% else %}
       <a href="{{ uploaded_file_url(foto.id) }}" class="gallery-link" data-gallery-item data-type="image" data-src="{{ uploaded_file_url(foto.id) }}" data-title="{{ seccion.nombre }}" data-file-name="{{ foto.archivo }}" data-index="{{ loop.index0 }}">
         <img src="{{ uploaded_file_url(foto.id) }}" alt="Archivo de {{ seccion.nombre }}" width="1200" height="900" loading="lazy">
@@ -242,27 +249,102 @@
       let uploadedCount = 0
       let failedCount = 0
 
+      function isVideo(file) {
+        return (file.type || "").startsWith("video/")
+      }
+
+      function uploadToS3(upload, file, fileIndex, totalFiles) {
+        return new Promise((resolve, reject) => {
+          const request = new XMLHttpRequest()
+          const payload = new FormData()
+          Object.entries(upload.fields || {}).forEach(([key, value]) => {
+            payload.append(key, value)
+          })
+          payload.append("file", file)
+
+          request.upload.addEventListener("progress", event => {
+            if (!event.lengthComputable) return
+            const percent = Math.round((event.loaded / event.total) * 100)
+            status.textContent = `Subiendo video ${fileIndex} de ${totalFiles}: ${percent}%`
+          })
+          request.addEventListener("load", () => {
+            if (request.status >= 200 && request.status < 300) {
+              resolve()
+              return
+            }
+            reject(new Error("No se pudo subir el video a S3."))
+          })
+          request.addEventListener("error", () => reject(new Error("Fallo la conexion con S3.")))
+          request.open("POST", upload.url)
+          request.send(payload)
+        })
+      }
+
+      async function uploadVideo(file, fileIndex, totalFiles) {
+        const maxSize = Number(form.dataset.videoMaxSize || 0)
+        if (maxSize && file.size > maxSize) {
+          throw new Error(`El video supera el maximo permitido de ${Math.round(maxSize / 1024 / 1024)} MB.`)
+        }
+
+        const presignResponse = await fetch(form.dataset.videoPresignUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken.value,
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            content_type: file.type || "video/mp4",
+            size_bytes: file.size,
+          }),
+        })
+        if (!presignResponse.ok) {
+          const errorPayload = await presignResponse.json().catch(() => ({}))
+          throw new Error(errorPayload.error || "No se pudo preparar la subida del video.")
+        }
+
+        const presign = await presignResponse.json()
+        await uploadToS3(presign.upload, file, fileIndex, totalFiles)
+
+        const completeResponse = await fetch(form.dataset.videoCompleteUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken.value,
+          },
+          body: JSON.stringify({ filename: presign.filename, size_bytes: file.size }),
+        })
+        if (!completeResponse.ok) {
+          const errorPayload = await completeResponse.json().catch(() => ({}))
+          throw new Error(errorPayload.error || "No se pudo confirmar la subida del video.")
+        }
+      }
+
       for (const [index, file] of files.entries()) {
         status.textContent = `Subiendo archivo ${index + 1} de ${files.length}: ${file.name}`
 
-        const payload = new FormData()
-        payload.append("csrf_token", csrfToken.value)
-        payload.append("fotos", file, file.name)
-
         try {
-          const response = await fetch(form.action, {
-            method: "POST",
-            body: payload,
-            credentials: "same-origin",
-          })
-
-          if (response.ok) {
-            uploadedCount += 1
+          if (isVideo(file)) {
+            await uploadVideo(file, index + 1, files.length)
           } else {
-            failedCount += 1
+            const payload = new FormData()
+            payload.append("csrf_token", csrfToken.value)
+            payload.append("fotos", file, file.name)
+            const response = await fetch(form.action, {
+              method: "POST",
+              body: payload,
+              credentials: "same-origin",
+            })
+            if (!response.ok) {
+              throw new Error("No se pudo subir el archivo.")
+            }
           }
-        } catch (_error) {
+          uploadedCount += 1
+        } catch (error) {
           failedCount += 1
+          status.textContent = error.message || `Fallo el archivo ${file.name}`
         }
       }
 

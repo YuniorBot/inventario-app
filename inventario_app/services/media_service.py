@@ -69,6 +69,11 @@ def get_upload_object_key(filename: str) -> str:
     return _build_object_key(current_app.config.get("S3_UPLOAD_PREFIX"), filename)
 
 
+def build_relative_upload_key(prefix: str, filename: str) -> str:
+    normalized_prefix = _normalize_prefix(prefix)
+    return f"{normalized_prefix}/{filename}" if normalized_prefix else filename
+
+
 def get_pdf_object_key(filename: str) -> str:
     return _build_object_key(current_app.config.get("S3_PDF_PREFIX"), filename)
 
@@ -180,6 +185,19 @@ def upload_pdf_bytes(filename: str, payload: bytes) -> None:
     get_pdf_file_path(filename).write_bytes(payload)
 
 
+def upload_uploaded_bytes(filename: str, payload: bytes, content_type: str) -> None:
+    if storage_backend_is_s3():
+        get_s3_client().put_object(
+            Bucket=get_s3_bucket_name(),
+            Key=get_upload_object_key(filename),
+            Body=payload,
+            ContentType=content_type,
+        )
+        return
+
+    get_uploaded_file_path(filename).write_bytes(payload)
+
+
 def upload_pdf_file(filename: str, source_path: Path) -> None:
     if storage_backend_is_s3():
         with source_path.open("rb") as fileobj:
@@ -229,6 +247,44 @@ def _generate_presigned_url(object_key: str) -> str:
 
 def get_uploaded_file_download_url(filename: str) -> str:
     return _generate_presigned_url(get_upload_object_key(filename))
+
+
+def create_presigned_upload_post(filename: str, content_type: str, max_size: int) -> dict:
+    if not storage_backend_is_s3():
+        raise RuntimeError("La subida directa solo esta disponible con STORAGE_BACKEND=s3.")
+
+    object_key = get_upload_object_key(filename)
+    return get_s3_client().generate_presigned_post(
+        Bucket=get_s3_bucket_name(),
+        Key=object_key,
+        Fields={"Content-Type": content_type},
+        Conditions=[
+            ["content-length-range", 1, max_size],
+            {"Content-Type": content_type},
+        ],
+        ExpiresIn=current_app.config.get("VIDEO_UPLOAD_EXPIRES_SECONDS", 900),
+    )
+
+
+def get_uploaded_file_size(filename: str) -> int | None:
+    if storage_backend_is_s3():
+        try:
+            response = get_s3_client().head_object(
+                Bucket=get_s3_bucket_name(), Key=get_upload_object_key(filename)
+            )
+        except KeyError:
+            return None
+        except ClientError as error:
+            error_code = (error.response or {}).get("Error", {}).get("Code")
+            if error_code in {"404", "NoSuchKey", "NotFound"}:
+                return None
+            raise
+        return response.get("ContentLength")
+
+    path = get_uploaded_file_path(filename)
+    if not path.is_file():
+        return None
+    return path.stat().st_size
 
 
 def get_pdf_file_download_url(filename: str) -> str:

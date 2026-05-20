@@ -44,13 +44,21 @@ class FakeS3Client:
     def head_object(self, Bucket, Key):
         if (Bucket, Key) not in self.objects:
             raise KeyError(Key)
-        return {}
+        return {"ContentLength": len(self.objects[(Bucket, Key)]["Body"])}
 
     def generate_presigned_url(self, _operation_name, Params, ExpiresIn):
         return (
             f"https://fake-s3.local/{Params['Bucket']}/{Params['Key']}"
             f"?expires={ExpiresIn}"
         )
+
+    def generate_presigned_post(self, Bucket, Key, Fields, Conditions, ExpiresIn):
+        return {
+            "url": f"https://fake-s3.local/{Bucket}",
+            "fields": {"key": Key, **Fields},
+            "conditions": Conditions,
+            "expires": ExpiresIn,
+        }
 
 
 class FakeSESClient:

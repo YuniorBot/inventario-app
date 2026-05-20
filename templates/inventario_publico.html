@@ -52,6 +52,7 @@
         <div class="public-media">
           {% for foto in s.fotos %}
             {% if is_video_file(foto.archivo) %}
+            {% if foto.processing_status in ['ready', 'processed'] %}
             <button
               type="button"
               class="gallery-link gallery-link-button"
@@ -68,6 +69,12 @@
                 </video>
               </div>
             </button>
+            {% else %}
+            <div class="gallery-link media-processing-card">
+              <span class="chip media-chip">Video en procesamiento</span>
+              <p class="muted">Estara disponible cuando finalice la compresion.</p>
+            </div>
+            {% endif %}
             {% else %}
             <a
               href="{{ public_uploaded_file_url(inventario.token, foto.id) }}"

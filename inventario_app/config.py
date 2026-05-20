@@ -66,3 +66,21 @@ class Config:
     UPLOAD_IMAGE_MAX_WIDTH = int(os.environ.get("UPLOAD_IMAGE_MAX_WIDTH", 1600))
     UPLOAD_IMAGE_MAX_HEIGHT = int(os.environ.get("UPLOAD_IMAGE_MAX_HEIGHT", 1200))
     UPLOAD_IMAGE_JPEG_QUALITY = int(os.environ.get("UPLOAD_IMAGE_JPEG_QUALITY", 80))
+    VIDEO_MAX_UPLOAD_BYTES = int(os.environ.get("VIDEO_MAX_UPLOAD_BYTES", 500 * 1024 * 1024))
+    VIDEO_UPLOAD_EXPIRES_SECONDS = int(os.environ.get("VIDEO_UPLOAD_EXPIRES_SECONDS", 900))
+    VIDEO_QUEUE_NAME = os.environ.get("VIDEO_QUEUE_NAME", "videos")
+    VIDEO_QUEUE_SYNC = os.environ.get("VIDEO_QUEUE_SYNC", "0") in {"1", "true", "TRUE"}
+    VIDEO_PROCESSING_TIMEOUT_SECONDS = int(
+        os.environ.get("VIDEO_PROCESSING_TIMEOUT_SECONDS", 1800)
+    )
+    VIDEO_OUTPUT_MAX_WIDTH = int(os.environ.get("VIDEO_OUTPUT_MAX_WIDTH", 1280))
+    VIDEO_OUTPUT_MAX_HEIGHT = int(os.environ.get("VIDEO_OUTPUT_MAX_HEIGHT", 720))
+    VIDEO_OUTPUT_CRF = int(os.environ.get("VIDEO_OUTPUT_CRF", 28))
+    VIDEO_OUTPUT_PRESET = os.environ.get("VIDEO_OUTPUT_PRESET", "veryfast")
+    VIDEO_OUTPUT_AUDIO_BITRATE = os.environ.get("VIDEO_OUTPUT_AUDIO_BITRATE", "96k")
+    VIDEO_ORIGINAL_PREFIX = os.environ.get(
+        "VIDEO_ORIGINAL_PREFIX", "videos/originals"
+    )
+    VIDEO_PROCESSED_PREFIX = os.environ.get(
+        "VIDEO_PROCESSED_PREFIX", "videos/processed"
+    )

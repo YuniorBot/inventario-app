@@ -23,6 +23,10 @@ def is_video_filename(filename: str) -> bool:
     return Path(filename).suffix.lower().lstrip(".") in VIDEO_EXTENSIONS
 
 
+def is_image_filename(filename: str) -> bool:
+    return Path(filename).suffix.lower().lstrip(".") in IMAGE_EXTENSIONS
+
+
 def validate_uploaded_file(file_storage) -> str | None:
     filename = file_storage.filename or ""
     if not allowed_file(filename):

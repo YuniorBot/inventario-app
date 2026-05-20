@@ -2,7 +2,7 @@ from flask import Blueprint, abort, redirect, send_from_directory
 from flask_login import login_required
 
 from ..extensions import db
-from ..constants import PDF_STATUS_READY
+from ..constants import MEDIA_TYPE_VIDEO, PDF_STATUS_READY, VIDEO_STATUS_PROCESSED, VIDEO_STATUS_READY
 from ..models import Foto
 from ..services.access import (
     get_foto_for_current_company_or_404,
@@ -26,6 +26,11 @@ bp = Blueprint("media", __name__)
 @login_required
 def uploaded_file(foto_id):
     foto = get_foto_for_current_company_or_404(foto_id)
+    if foto.tipo == MEDIA_TYPE_VIDEO and foto.processing_status not in {
+        VIDEO_STATUS_READY,
+        VIDEO_STATUS_PROCESSED,
+    }:
+        return ("", 404)
     if not uploaded_file_exists(foto.archivo):
         return ("", 404)
     if storage_backend_is_s3():
@@ -43,6 +48,11 @@ def public_uploaded_file(token, foto_id):
     if foto.seccion.inventario.token != token:
         abort(404)
 
+    if foto.tipo == MEDIA_TYPE_VIDEO and foto.processing_status not in {
+        VIDEO_STATUS_READY,
+        VIDEO_STATUS_PROCESSED,
+    }:
+        abort(404)
     if not uploaded_file_exists(foto.archivo):
         abort(404)
     if storage_backend_is_s3():

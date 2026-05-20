@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy.sql import func
 
 from ..extensions import db
-from ..constants import PDF_STATUS_NOT_STARTED
+from ..constants import MEDIA_TYPE_IMAGE, PDF_STATUS_NOT_STARTED, VIDEO_STATUS_READY
 
 
 class Inmueble(db.Model):
@@ -116,6 +116,14 @@ class Foto(db.Model):
         db.Integer, db.ForeignKey("seccion.id"), nullable=False, index=True
     )
     archivo = db.Column(db.String(255), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False, default=MEDIA_TYPE_IMAGE, index=True)
+    archivo_original = db.Column(db.String(255), nullable=True)
+    processing_status = db.Column(
+        db.String(30), nullable=False, default=VIDEO_STATUS_READY, index=True
+    )
+    processing_error = db.Column(db.Text, nullable=True)
+    size_bytes = db.Column(db.BigInteger, nullable=True)
+    duration_seconds = db.Column(db.Integer, nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, server_default=func.now()
     )
