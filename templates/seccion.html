@@ -91,7 +91,7 @@
     {% for foto in fotos %}
     <article class="media-card fade-in delay-1">
       {% if is_video_file(foto.archivo) %}
-      {% if foto.processing_status in ['ready', 'processed'] %}
+      {% if foto.processing_status in ['ready', 'processing', 'processed'] %}
       <button
         type="button"
         class="gallery-link gallery-link-button"
@@ -106,6 +106,11 @@
           <source src="{{ uploaded_file_url(foto.id) }}">
         </video>
       </button>
+      {% if foto.processing_status == 'processing' %}
+      <p class="muted">Video disponible. Optimizando en segundo plano.</p>
+      {% elif foto.processing_status == 'ready' and foto.processing_error %}
+      <p class="muted">{{ foto.processing_error }}</p>
+      {% endif %}
       {% else %}
       <div class="gallery-link media-processing-card">
         <span class="chip media-chip">Video {{ 'fallo' if foto.processing_status == 'failed' else 'en procesamiento' }}</span>

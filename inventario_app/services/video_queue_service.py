@@ -7,13 +7,15 @@ from ..constants import (
     VIDEO_STATUS_PENDING_PROCESSING,
     VIDEO_STATUS_PROCESSED,
     VIDEO_STATUS_PROCESSING,
+    VIDEO_STATUS_READY,
 )
 from ..extensions import db
 from ..models import Foto
 
 
 def enqueue_video_processing(foto: Foto) -> None:
-    foto.processing_status = VIDEO_STATUS_PENDING_PROCESSING
+    if foto.processing_status != VIDEO_STATUS_READY:
+        foto.processing_status = VIDEO_STATUS_PENDING_PROCESSING
     foto.processing_error = None
     db.session.commit()
 
@@ -59,5 +61,11 @@ def set_video_processed(foto: Foto, filename: str, duration_seconds: int | None 
 
 def set_video_failed(foto: Foto, message: str) -> None:
     foto.processing_status = VIDEO_STATUS_FAILED
+    foto.processing_error = message[:1000]
+    db.session.commit()
+
+
+def set_video_ready_with_warning(foto: Foto, message: str) -> None:
+    foto.processing_status = VIDEO_STATUS_READY
     foto.processing_error = message[:1000]
     db.session.commit()

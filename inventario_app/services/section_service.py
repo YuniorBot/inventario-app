@@ -5,7 +5,7 @@ from flask import current_app
 from ..constants import (
     MEDIA_TYPE_IMAGE,
     MEDIA_TYPE_VIDEO,
-    VIDEO_STATUS_PENDING_PROCESSING,
+    VIDEO_STATUS_READY,
 )
 from ..extensions import db
 from ..models import Foto, Observacion, Seccion
@@ -175,7 +175,7 @@ def complete_direct_video_upload(
         archivo=filename,
         archivo_original=filename,
         tipo=MEDIA_TYPE_VIDEO,
-        processing_status=VIDEO_STATUS_PENDING_PROCESSING,
+        processing_status=VIDEO_STATUS_READY,
         size_bytes=final_size,
     )
     db.session.add(foto)

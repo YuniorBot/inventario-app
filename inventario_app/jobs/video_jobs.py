@@ -8,7 +8,9 @@ from inventario_app.services.video_queue_service import (
     set_video_failed,
     set_video_processed,
     set_video_processing,
+    set_video_ready_with_warning,
 )
+from inventario_app.services.media_service import delete_uploaded_file, uploaded_file_exists
 
 
 def process_video_job(foto_id: int, raise_on_error: bool = True) -> None:
@@ -25,15 +27,30 @@ def process_video_job(foto_id: int, raise_on_error: bool = True) -> None:
 
         set_video_processing(foto)
         try:
+            original_filename = foto.archivo_original
             filename, duration = process_video_file(foto)
         except Exception as error:
             app.logger.exception("video_processing_failed foto_id=%s", foto_id)
-            set_video_failed(foto, "No se pudo procesar el video en este momento.")
+            if foto.archivo and uploaded_file_exists(foto.archivo):
+                set_video_ready_with_warning(
+                    foto,
+                    "No se pudo optimizar el video; se muestra el original.",
+                )
+            else:
+                set_video_failed(foto, "No se pudo procesar el video en este momento.")
             if raise_on_error:
                 raise error
             return
 
         set_video_processed(foto, filename, duration)
+        if (
+            original_filename
+            and original_filename != filename
+            and uploaded_file_exists(filename)
+        ):
+            delete_uploaded_file(original_filename)
+            foto.archivo_original = None
+            db.session.commit()
         app.logger.info("video_processed foto_id=%s archivo=%s", foto.id, filename)
 
     if has_app_context():
