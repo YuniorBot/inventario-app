@@ -43,7 +43,10 @@ def process_video_file(foto: Foto) -> tuple[str, int | None]:
 def _run_ffmpeg(input_path: Path, output_path: Path) -> None:
     max_width = current_app.config.get("VIDEO_OUTPUT_MAX_WIDTH", 1280)
     max_height = current_app.config.get("VIDEO_OUTPUT_MAX_HEIGHT", 720)
-    scale_filter = f"scale={max_width}:{max_height}:force_original_aspect_ratio=decrease"
+    scale_filter = (
+        f"scale={max_width}:{max_height}:force_original_aspect_ratio=decrease,"
+        "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+    )
     command = [
         "ffmpeg",
         "-y",
