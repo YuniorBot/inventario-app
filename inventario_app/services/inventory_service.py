@@ -3,6 +3,7 @@ import binascii
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import date
 
 from flask import current_app
 
@@ -77,6 +78,33 @@ def rename_inventory(inventario: Inventario, nombre: str) -> bool:
     db.session.commit()
     current_app.logger.info("inventario_renamed inventario_id=%s", inventario.id)
     return True
+
+
+def duplicate_inventory_structure(inventario: Inventario) -> Inventario:
+    nuevo = Inventario(
+        inmueble_id=inventario.inmueble_id,
+        nombre=f"{inventario.nombre} - copia",
+        fecha=date.today(),
+        token=str(uuid.uuid4()),
+    )
+    db.session.add(nuevo)
+    db.session.flush()
+
+    secciones = (
+        Seccion.query.filter_by(inventario_id=inventario.id)
+        .order_by(Seccion.id.asc())
+        .all()
+    )
+    for seccion in secciones:
+        db.session.add(Seccion(inventario_id=nuevo.id, nombre=seccion.nombre))
+
+    db.session.commit()
+    current_app.logger.info(
+        "inventario_duplicated inventario_id=%s nuevo_inventario_id=%s",
+        inventario.id,
+        nuevo.id,
+    )
+    return nuevo
 
 
 def list_inventory_sections(inventario_id: int) -> list[Seccion]:

@@ -157,6 +157,47 @@ def test_empty_inventory_name_is_rejected(client, login, seeded_data, app):
         assert inventario.nombre == "Entrega inicial"
 
 
+def test_admin_can_duplicate_inventory_structure_only(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        original = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
+        seccion.descripcion = "No copiar descripcion"
+        db.session.add(Foto(seccion_id=seccion.id, archivo="foto.jpg"))
+        db.session.add(
+            Observacion(seccion_id=seccion.id, comentario="No copiar observacion")
+        )
+        db.session.commit()
+        original_id = original.id
+        original_token = original.token
+
+    response = client.post(
+        f"/duplicar_inventario/{original_id}",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        nuevo = (
+            Inventario.query.filter_by(inmueble_id=seeded_data["inmueble_a"].id)
+            .order_by(Inventario.id.desc())
+            .first()
+        )
+        assert nuevo.id != original_id
+        assert nuevo.nombre == "Entrega inicial - copia"
+        assert nuevo.token != original_token
+        assert response.headers["Location"].endswith(f"/inventario/{nuevo.id}")
+
+        secciones_nuevas = (
+            Seccion.query.filter_by(inventario_id=nuevo.id).order_by(Seccion.id.asc()).all()
+        )
+        assert [seccion.nombre for seccion in secciones_nuevas] == ["Sala A"]
+        assert all(seccion.descripcion is None for seccion in secciones_nuevas)
+        assert sum(len(seccion.fotos) for seccion in secciones_nuevas) == 0
+        assert sum(len(seccion.observaciones) for seccion in secciones_nuevas) == 0
+
+
 def test_admin_can_edit_section_name(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 

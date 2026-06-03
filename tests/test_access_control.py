@@ -99,6 +99,22 @@ def test_admin_cannot_edit_other_company_inventory_name(client, login, seeded_da
     assert response.status_code == 403
 
 
+def test_viewer_cannot_duplicate_inventory(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    response = client.post(f"/duplicar_inventario/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_duplicate_other_company_inventory(client, login, seeded_data):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(f"/duplicar_inventario/{seeded_data['inventario_b'].id}")
+
+    assert response.status_code == 403
+
+
 def test_viewer_cannot_edit_observation(client, login, seeded_data, app):
     login(seeded_data["viewer_a"].email)
 

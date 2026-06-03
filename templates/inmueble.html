@@ -146,6 +146,14 @@
       </div>
       <div class="card-actions">
         <a class="button" href="/inventario/{{ inv.id }}">Entrar al inventario</a>
+        {% if can_edit %}
+        <form action="/duplicar_inventario/{{ inv.id }}" method="POST" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="button button-secondary" onclick="return confirm('¿Duplicar este inventario solo con sus secciones, sin fotos ni observaciones?')">
+            Duplicar inventario
+          </button>
+        </form>
+        {% endif %}
       </div>
     </article>
     {% endfor %}

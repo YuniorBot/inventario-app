@@ -19,6 +19,7 @@ from ..services.access import (
 from ..services.media_service import get_pdf_file_url
 from ..services.inventory_service import (
     create_inventory,
+    duplicate_inventory_structure,
     list_inventory_sections,
     rename_inventory,
     save_inventory_signature,
@@ -70,6 +71,19 @@ def editar_nombre_inventario(id):
     return redirect(
         url_for("inmuebles.ver_inmueble", id=inmueble_id) + "#inventarios-registrados"
     )
+
+
+@bp.route(
+    "/duplicar_inventario/<int:id>", methods=["POST"], endpoint="duplicar_inventario"
+)
+@login_required
+def duplicar_inventario(id):
+    require_edit_permission()
+    inventario = get_inventario_for_current_company_or_404(id)
+    nuevo = duplicate_inventory_structure(inventario)
+
+    flash("Inventario duplicado correctamente.", "success")
+    return redirect(url_for("inventarios.ver_inventario", id=nuevo.id))
 
 
 @bp.route("/inventario/<int:id>", endpoint="ver_inventario")
