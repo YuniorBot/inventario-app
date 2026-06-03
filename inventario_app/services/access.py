@@ -3,7 +3,7 @@ from flask_login import current_user, logout_user
 
 from ..constants import EDIT_ROLES, ROLE_ADMIN, ROLE_SUPERADMIN, STATUS_ACTIVE
 from ..extensions import db
-from ..models import Empresa, Foto, Inmueble, Inventario, Seccion, Usuario
+from ..models import Empresa, Foto, Inmueble, Inventario, Observacion, Seccion, Usuario
 
 
 def user_can_edit(user) -> bool:
@@ -127,6 +127,14 @@ def get_foto_for_current_company_or_404(foto_id: int) -> Foto:
         foto_id,
         Foto,
         lambda foto: foto.seccion.inventario.inmueble.empresa_id,
+    )
+
+
+def get_observacion_for_current_company_or_404(observacion_id: int) -> Observacion:
+    return _get_entity_for_current_company_or_404(
+        observacion_id,
+        Observacion,
+        lambda observacion: observacion.seccion.inventario.inmueble.empresa_id,
     )
 
 

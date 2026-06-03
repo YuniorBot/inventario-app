@@ -212,6 +212,30 @@ def create_section_observation(seccion: Seccion, comentario: str) -> bool:
     return True
 
 
+def update_section_observation(observacion: Observacion, comentario: str) -> bool:
+    comentario = comentario.strip()
+    if not comentario:
+        return False
+
+    observacion.comentario = comentario
+    mark_inventory_pdf_dirty(observacion.seccion.inventario)
+    db.session.commit()
+    current_app.logger.info("observacion_updated observacion_id=%s", observacion.id)
+    return True
+
+
+def delete_section_observation(observacion: Observacion) -> int:
+    seccion_id = observacion.seccion_id
+    observacion_id = observacion.id
+    mark_inventory_pdf_dirty(observacion.seccion.inventario)
+    db.session.delete(observacion)
+    db.session.commit()
+    current_app.logger.info(
+        "observacion_deleted observacion_id=%s seccion_id=%s", observacion_id, seccion_id
+    )
+    return seccion_id
+
+
 def create_inventory_section(inventario_id: int, nombre: str) -> bool:
     nombre = nombre.strip()
     if not nombre:

@@ -14,6 +14,7 @@ from ..models import Foto, Observacion, Seccion
 from ..services.access import (
     get_foto_for_current_company_or_404,
     get_inventario_for_current_company_or_404,
+    get_observacion_for_current_company_or_404,
     get_seccion_for_current_company_or_404,
     require_edit_permission,
 )
@@ -23,10 +24,12 @@ from ..services.section_service import (
     create_section_observation,
     complete_direct_video_upload,
     delete_inventory_section,
+    delete_section_observation,
     delete_section_photo,
     prepare_direct_video_upload,
     rename_section,
     save_section_description,
+    update_section_observation,
     upload_section_files,
 )
 from ..utils.files import is_video_filename
@@ -140,6 +143,35 @@ def crear_observacion(id):
 
     flash("Observacion guardada.", "success")
     return redirect(url_for("secciones.ver_seccion", id=id))
+
+
+@bp.route(
+    "/editar_observacion/<int:id>", methods=["POST"], endpoint="editar_observacion"
+)
+@login_required
+def editar_observacion(id):
+    require_edit_permission()
+    observacion = get_observacion_for_current_company_or_404(id)
+    seccion_id = observacion.seccion_id
+
+    if not update_section_observation(observacion, request.form.get("comentario", "")):
+        flash("La observacion no puede estar vacia.", "error")
+        return redirect(url_for("secciones.ver_seccion", id=seccion_id) + "#observaciones")
+
+    flash("Observacion actualizada.", "success")
+    return redirect(url_for("secciones.ver_seccion", id=seccion_id) + "#observaciones")
+
+
+@bp.route(
+    "/eliminar_observacion/<int:id>", methods=["POST"], endpoint="eliminar_observacion"
+)
+@login_required
+def eliminar_observacion(id):
+    require_edit_permission()
+    observacion = get_observacion_for_current_company_or_404(id)
+    seccion_id = delete_section_observation(observacion)
+    flash("Observacion eliminada.", "success")
+    return redirect(url_for("secciones.ver_seccion", id=seccion_id) + "#observaciones")
 
 
 @bp.route("/crear_seccion/<int:id>", methods=["POST"], endpoint="crear_seccion")

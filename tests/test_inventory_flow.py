@@ -1,5 +1,5 @@
 from inventario_app.extensions import db
-from inventario_app.models import Foto, Inmueble, Inventario, Seccion
+from inventario_app.models import Foto, Inmueble, Inventario, Observacion, Seccion
 from inventario_app.services.media_service import get_upload_object_key
 
 
@@ -127,6 +127,36 @@ def test_admin_can_create_inventory_with_default_sections(
         }
 
 
+def test_admin_can_edit_inventory_name(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_nombre_inventario/{seeded_data['inventario_a'].id}",
+        data={"nombre": "Inventario actualizado"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.nombre == "Inventario actualizado"
+
+
+def test_empty_inventory_name_is_rejected(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_nombre_inventario/{seeded_data['inventario_a'].id}",
+        data={"nombre": "   "},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.nombre == "Entrega inicial"
+
+
 def test_admin_can_edit_section_name(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 
@@ -175,6 +205,76 @@ def test_admin_can_save_section_description(client, login, seeded_data, app):
     with app.app_context():
         seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
         assert seccion.descripcion == "Estado general del baño y accesorios completos."
+
+
+def test_admin_can_edit_observation(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Texto original",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(
+        f"/editar_observacion/{observacion_id}",
+        data={"comentario": "Texto actualizado"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        observacion = db.session.get(Observacion, observacion_id)
+        assert observacion.comentario == "Texto actualizado"
+
+
+def test_empty_observation_edit_is_rejected(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Texto original",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(
+        f"/editar_observacion/{observacion_id}",
+        data={"comentario": "   "},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        observacion = db.session.get(Observacion, observacion_id)
+        assert observacion.comentario == "Texto original"
+
+
+def test_admin_can_delete_observation(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Texto a eliminar",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(
+        f"/eliminar_observacion/{observacion_id}",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        assert db.session.get(Observacion, observacion_id) is None
 
 
 def test_deleting_section_removes_uploaded_files(client, login, seeded_data, app):

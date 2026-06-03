@@ -20,6 +20,7 @@ from ..services.media_service import get_pdf_file_url
 from ..services.inventory_service import (
     create_inventory,
     list_inventory_sections,
+    rename_inventory,
     save_inventory_signature,
 )
 from ..services.pdf_queue_service import enqueue_inventory_pdf, get_pdf_status_payload
@@ -45,6 +46,30 @@ def crear_inventario(id):
 
     flash("Inventario creado correctamente.", "success")
     return redirect(url_for("inmuebles.ver_inmueble", id=id))
+
+
+@bp.route(
+    "/editar_nombre_inventario/<int:id>",
+    methods=["POST"],
+    endpoint="editar_nombre_inventario",
+)
+@login_required
+def editar_nombre_inventario(id):
+    require_edit_permission()
+    inventario = get_inventario_for_current_company_or_404(id)
+    inmueble_id = inventario.inmueble_id
+
+    if not rename_inventory(inventario, request.form.get("nombre", "")):
+        flash("El nombre del inventario no puede estar vacio.", "error")
+        return redirect(
+            url_for("inmuebles.ver_inmueble", id=inmueble_id)
+            + "#inventarios-registrados"
+        )
+
+    flash("Nombre del inventario actualizado.", "success")
+    return redirect(
+        url_for("inmuebles.ver_inmueble", id=inmueble_id) + "#inventarios-registrados"
+    )
 
 
 @bp.route("/inventario/<int:id>", endpoint="ver_inventario")

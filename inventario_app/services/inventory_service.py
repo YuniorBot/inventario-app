@@ -67,6 +67,18 @@ def create_inventory(
     return CreateInventoryResult(inventory=nuevo, is_valid=True)
 
 
+def rename_inventory(inventario: Inventario, nombre: str) -> bool:
+    nombre = nombre.strip()
+    if not nombre:
+        return False
+
+    inventario.nombre = nombre
+    mark_inventory_pdf_dirty(inventario)
+    db.session.commit()
+    current_app.logger.info("inventario_renamed inventario_id=%s", inventario.id)
+    return True
+
+
 def list_inventory_sections(inventario_id: int) -> list[Seccion]:
     return (
         Seccion.query.filter_by(inventario_id=inventario_id)

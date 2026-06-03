@@ -1,3 +1,7 @@
+from inventario_app.extensions import db
+from inventario_app.models import Observacion, Seccion
+
+
 def test_viewer_cannot_create_inmueble(client, login, seeded_data):
     login(seeded_data["viewer_a"].email)
 
@@ -69,6 +73,108 @@ def test_admin_cannot_edit_other_company_inmueble_owner(client, login, seeded_da
         f"/editar_propietario_inmueble/{seeded_data['inmueble_b'].id}",
         data={"propietario": "Cambio cruzado"},
     )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_edit_inventory_name(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    response = client.post(
+        f"/editar_nombre_inventario/{seeded_data['inventario_a'].id}",
+        data={"nombre": "Cambio no permitido"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_edit_other_company_inventory_name(client, login, seeded_data):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_nombre_inventario/{seeded_data['inventario_b'].id}",
+        data={"nombre": "Cambio cruzado"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_edit_observation(client, login, seeded_data, app):
+    login(seeded_data["viewer_a"].email)
+
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Texto original",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(
+        f"/editar_observacion/{observacion_id}",
+        data={"comentario": "Cambio no permitido"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_delete_observation(client, login, seeded_data, app):
+    login(seeded_data["viewer_a"].email)
+
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Texto original",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(f"/eliminar_observacion/{observacion_id}")
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_edit_other_company_observation(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        seccion_b = Seccion(inventario_id=seeded_data["inventario_b"].id, nombre="Sala B")
+        db.session.add(seccion_b)
+        db.session.flush()
+        observacion = Observacion(
+            seccion_id=seccion_b.id,
+            comentario="Texto empresa B",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(
+        f"/editar_observacion/{observacion_id}",
+        data={"comentario": "Cambio cruzado"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_delete_other_company_observation(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        seccion_b = Seccion(inventario_id=seeded_data["inventario_b"].id, nombre="Sala B")
+        db.session.add(seccion_b)
+        db.session.flush()
+        observacion = Observacion(
+            seccion_id=seccion_b.id,
+            comentario="Texto empresa B",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    response = client.post(f"/eliminar_observacion/{observacion_id}")
 
     assert response.status_code == 403
 

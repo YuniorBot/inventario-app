@@ -129,6 +129,16 @@
         <span>Inventario disponible para gestion</span>
       </div>
       <h3 class="card-title">{{ inv.nombre }}</h3>
+      {% if can_edit %}
+      <form action="/editar_nombre_inventario/{{ inv.id }}" method="POST" class="stack inventory-name-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label for="nombre-inventario-{{ inv.id }}">Editar nombre</label>
+          <input id="nombre-inventario-{{ inv.id }}" type="text" name="nombre" autocomplete="off" value="{{ inv.nombre }}" required>
+        </div>
+        <button type="submit" class="button button-secondary">Actualizar nombre</button>
+      </form>
+      {% endif %}
       <p class="muted">Accede al recorrido completo, administra secciones y prepara la version final para compartir.</p>
       <div class="property-meta">
         <span class="chip">{{ inv.fecha }}</span>
