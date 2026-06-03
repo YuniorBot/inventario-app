@@ -130,13 +130,16 @@
       </div>
       <h3 class="card-title">{{ inv.nombre }}</h3>
       {% if can_edit %}
-      <form action="/editar_nombre_inventario/{{ inv.id }}" method="POST" class="stack inventory-name-form">
+      <form action="/editar_nombre_inventario/{{ inv.id }}" method="POST" class="stack inventory-name-form" id="inventory-name-form-{{ inv.id }}" hidden>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label for="nombre-inventario-{{ inv.id }}">Editar nombre</label>
           <input id="nombre-inventario-{{ inv.id }}" type="text" name="nombre" autocomplete="off" value="{{ inv.nombre }}" required>
         </div>
-        <button type="submit" class="button button-secondary">Actualizar nombre</button>
+        <div class="inline-actions">
+          <button type="submit" class="button button-secondary">Guardar cambios</button>
+          <button type="button" class="button button-secondary" data-inventory-edit-cancel="{{ inv.id }}">Cancelar</button>
+        </div>
       </form>
       {% endif %}
       <p class="muted">Accede al recorrido completo, administra secciones y prepara la version final para compartir.</p>
@@ -147,6 +150,9 @@
       <div class="card-actions">
         <a class="button" href="/inventario/{{ inv.id }}">Entrar al inventario</a>
         {% if can_edit %}
+        <button type="button" class="button button-secondary" data-inventory-edit-toggle="{{ inv.id }}">
+          Actualizar nombre
+        </button>
         <form action="/duplicar_inventario/{{ inv.id }}" method="POST" class="inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="button button-secondary" onclick="return confirm('¿Duplicar este inventario solo con sus secciones, sin fotos ni observaciones?')">
@@ -165,4 +171,45 @@
   </div>
   {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  ;(() => {
+    const toggleButtons = document.querySelectorAll("[data-inventory-edit-toggle]")
+
+    toggleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const inventoryId = button.dataset.inventoryEditToggle
+        const form = document.getElementById(`inventory-name-form-${inventoryId}`)
+        if (!form) {
+          return
+        }
+
+        form.hidden = !form.hidden
+        button.textContent = form.hidden ? "Actualizar nombre" : "Ocultar edición"
+
+        if (!form.hidden) {
+          const input = form.querySelector("input[name='nombre']")
+          input?.focus()
+          input?.select()
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-inventory-edit-cancel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const inventoryId = button.dataset.inventoryEditCancel
+        const form = document.getElementById(`inventory-name-form-${inventoryId}`)
+        const toggle = document.querySelector(`[data-inventory-edit-toggle='${inventoryId}']`)
+        if (form) {
+          form.hidden = true
+        }
+        if (toggle) {
+          toggle.textContent = "Actualizar nombre"
+        }
+      })
+    })
+  })()
+</script>
 {% endblock %}
