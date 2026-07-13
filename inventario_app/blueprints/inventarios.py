@@ -7,7 +7,7 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from ..constants import PDF_STATUS_FAILED, PDF_STATUS_READY
 from ..models import Inventario
@@ -39,6 +39,7 @@ def crear_inventario(id):
         inmueble.id,
         request.form.get("nombre", ""),
         request.form.get("fecha", ""),
+        current_user.id,
     )
 
     if not result.is_valid:
@@ -80,7 +81,7 @@ def editar_nombre_inventario(id):
 def duplicar_inventario(id):
     require_edit_permission()
     inventario = get_inventario_for_current_company_or_404(id)
-    nuevo = duplicate_inventory_structure(inventario)
+    nuevo = duplicate_inventory_structure(inventario, current_user.id)
 
     flash("Inventario duplicado correctamente.", "success")
     return redirect(url_for("inventarios.ver_inventario", id=nuevo.id))

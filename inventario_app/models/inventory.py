@@ -37,6 +37,9 @@ class Inventario(db.Model):
     inmueble_id = db.Column(
         db.Integer, db.ForeignKey("inmueble.id"), nullable=False, index=True
     )
+    created_by_id = db.Column(
+        db.Integer, db.ForeignKey("usuario.id"), nullable=True, index=True
+    )
     nombre = db.Column(db.String(200), nullable=False)
     fecha = db.Column(db.Date, nullable=False)
     token = db.Column(
@@ -77,6 +80,7 @@ class Inventario(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+    creador = db.relationship("Usuario", foreign_keys=[created_by_id])
 
 
 class Seccion(db.Model):

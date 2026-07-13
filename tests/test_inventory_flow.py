@@ -114,6 +114,8 @@ def test_admin_can_create_inventory_with_default_sections(
     with app.app_context():
         inventario = Inventario.query.filter_by(nombre="Entrega abril").first()
         assert inventario is not None
+        assert inventario.created_by_id == seeded_data["admin_a"].id
+        assert inventario.creador.nombre == "Admin A"
         secciones = Seccion.query.filter_by(inventario_id=inventario.id).all()
         assert len(secciones) == 7
         assert {seccion.nombre for seccion in secciones} == {
@@ -186,6 +188,7 @@ def test_admin_can_duplicate_inventory_structure_only(client, login, seeded_data
         )
         assert nuevo.id != original_id
         assert nuevo.nombre == "Entrega inicial - copia"
+        assert nuevo.created_by_id == seeded_data["admin_a"].id
         assert nuevo.token != original_token
         assert response.headers["Location"].endswith(f"/inventario/{nuevo.id}")
 
@@ -196,6 +199,24 @@ def test_admin_can_duplicate_inventory_structure_only(client, login, seeded_data
         assert all(seccion.descripcion is None for seccion in secciones_nuevas)
         assert sum(len(seccion.fotos) for seccion in secciones_nuevas) == 0
         assert sum(len(seccion.observaciones) for seccion in secciones_nuevas) == 0
+
+
+def test_inmueble_inventory_card_shows_creator_only_when_present(
+    client, login, seeded_data, app
+):
+    login(seeded_data["admin_a"].email)
+
+    client.post(
+        f"/crear_inventario/{seeded_data['inmueble_a'].id}",
+        data={"nombre": "Entrega con creador", "fecha": "2026-04-12"},
+        follow_redirects=False,
+    )
+
+    response = client.get(f"/inmueble/{seeded_data['inmueble_a'].id}")
+
+    assert response.status_code == 200
+    assert b"Creado por Admin A" in response.data
+    assert response.data.count(b"Creado por") == 1
 
 
 def test_admin_can_edit_section_name(client, login, seeded_data, app):

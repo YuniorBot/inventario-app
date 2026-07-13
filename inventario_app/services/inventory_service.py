@@ -42,7 +42,7 @@ class GenerateInventoryPdfResult:
 
 
 def create_inventory(
-    inmueble_id: int, nombre: str, fecha_raw: str
+    inmueble_id: int, nombre: str, fecha_raw: str, created_by_id: int | None = None
 ) -> CreateInventoryResult:
     nombre = nombre.strip()
     fecha = parse_iso_date(fecha_raw)
@@ -51,6 +51,7 @@ def create_inventory(
 
     nuevo = Inventario(
         inmueble_id=inmueble_id,
+        created_by_id=created_by_id,
         nombre=nombre,
         fecha=fecha,
         token=str(uuid.uuid4()),
@@ -80,9 +81,12 @@ def rename_inventory(inventario: Inventario, nombre: str) -> bool:
     return True
 
 
-def duplicate_inventory_structure(inventario: Inventario) -> Inventario:
+def duplicate_inventory_structure(
+    inventario: Inventario, created_by_id: int | None = None
+) -> Inventario:
     nuevo = Inventario(
         inmueble_id=inventario.inmueble_id,
+        created_by_id=created_by_id,
         nombre=f"{inventario.nombre} - copia",
         fecha=date.today(),
         token=str(uuid.uuid4()),

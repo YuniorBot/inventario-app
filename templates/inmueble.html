@@ -145,6 +145,9 @@
       <p class="muted">Accede al recorrido completo, administra secciones y prepara la version final para compartir.</p>
       <div class="property-meta">
         <span class="chip">{{ inv.fecha }}</span>
+        {% if inv.creador %}
+        <span class="chip">Creado por {{ inv.creador.nombre }}</span>
+        {% endif %}
         <span class="chip">Token publico activo</span>
       </div>
       <div class="card-actions">
