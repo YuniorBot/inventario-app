@@ -108,13 +108,19 @@
         <strong>Fecha de recepcion</strong>
         <p>{{ inmueble.fecha_recepcion }}</p>
         {% if can_edit %}
-        <form action="/editar_fecha_recepcion_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+        <button type="button" class="button button-secondary" data-reception-date-edit-toggle="{{ inmueble.id }}">
+          Actualizar fecha
+        </button>
+        <form action="/editar_fecha_recepcion_inmueble/{{ inmueble.id }}" method="POST" class="stack" id="reception-date-form-{{ inmueble.id }}" hidden>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div>
             <label for="fecha-recepcion-inmueble">Editar fecha de recepcion</label>
             <input id="fecha-recepcion-inmueble" type="date" name="fecha_recepcion" value="{{ inmueble.fecha_recepcion }}" required>
           </div>
-          <button type="submit" class="button button-secondary">Actualizar fecha</button>
+          <div class="inline-actions">
+            <button type="submit" class="button button-secondary">Guardar cambios</button>
+            <button type="button" class="button button-secondary" data-reception-date-edit-cancel="{{ inmueble.id }}">Cancelar</button>
+          </div>
         </form>
         {% endif %}
       </article>
@@ -161,13 +167,16 @@
         <span class="chip">Token publico activo</span>
       </div>
       {% if can_edit %}
-      <form action="/editar_fecha_inventario/{{ inv.id }}" method="POST" class="stack">
+      <form action="/editar_fecha_inventario/{{ inv.id }}" method="POST" class="stack" id="inventory-date-form-{{ inv.id }}" hidden>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label for="fecha-inventario-{{ inv.id }}">Editar fecha del inventario</label>
           <input id="fecha-inventario-{{ inv.id }}" type="date" name="fecha" value="{{ inv.fecha }}" required>
         </div>
-        <button type="submit" class="button button-secondary">Actualizar fecha</button>
+        <div class="inline-actions">
+          <button type="submit" class="button button-secondary">Guardar cambios</button>
+          <button type="button" class="button button-secondary" data-inventory-date-edit-cancel="{{ inv.id }}">Cancelar</button>
+        </div>
       </form>
       {% endif %}
       <div class="card-actions">
@@ -175,6 +184,9 @@
         {% if can_edit %}
         <button type="button" class="button button-secondary" data-inventory-edit-toggle="{{ inv.id }}">
           Actualizar nombre
+        </button>
+        <button type="button" class="button button-secondary" data-inventory-date-edit-toggle="{{ inv.id }}">
+          Actualizar fecha
         </button>
         <form action="/duplicar_inventario/{{ inv.id }}" method="POST" class="inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -230,6 +242,68 @@
         }
         if (toggle) {
           toggle.textContent = "Actualizar nombre"
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-reception-date-edit-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const inmuebleId = button.dataset.receptionDateEditToggle
+        const form = document.getElementById(`reception-date-form-${inmuebleId}`)
+        if (!form) {
+          return
+        }
+
+        form.hidden = !form.hidden
+        button.textContent = form.hidden ? "Actualizar fecha" : "Ocultar edición"
+
+        if (!form.hidden) {
+          form.querySelector("input[name='fecha_recepcion']")?.focus()
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-reception-date-edit-cancel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const inmuebleId = button.dataset.receptionDateEditCancel
+        const form = document.getElementById(`reception-date-form-${inmuebleId}`)
+        const toggle = document.querySelector(`[data-reception-date-edit-toggle='${inmuebleId}']`)
+        if (form) {
+          form.hidden = true
+        }
+        if (toggle) {
+          toggle.textContent = "Actualizar fecha"
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-inventory-date-edit-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const inventoryId = button.dataset.inventoryDateEditToggle
+        const form = document.getElementById(`inventory-date-form-${inventoryId}`)
+        if (!form) {
+          return
+        }
+
+        form.hidden = !form.hidden
+        button.textContent = form.hidden ? "Actualizar fecha" : "Ocultar edición"
+
+        if (!form.hidden) {
+          form.querySelector("input[name='fecha']")?.focus()
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-inventory-date-edit-cancel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const inventoryId = button.dataset.inventoryDateEditCancel
+        const form = document.getElementById(`inventory-date-form-${inventoryId}`)
+        const toggle = document.querySelector(`[data-inventory-date-edit-toggle='${inventoryId}']`)
+        if (form) {
+          form.hidden = true
+        }
+        if (toggle) {
+          toggle.textContent = "Actualizar fecha"
         }
       })
     })
