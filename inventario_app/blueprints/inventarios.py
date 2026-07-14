@@ -10,6 +10,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from ..constants import PDF_STATUS_FAILED, PDF_STATUS_READY
+from ..extensions import db
 from ..models import Inventario
 from ..services.access import (
     get_inmueble_for_current_company_or_404,
@@ -24,7 +25,12 @@ from ..services.inventory_service import (
     rename_inventory,
     save_inventory_signature,
 )
-from ..services.pdf_queue_service import enqueue_inventory_pdf, get_pdf_status_payload
+from ..services.pdf_queue_service import (
+    enqueue_inventory_pdf,
+    get_pdf_status_payload,
+    mark_inventory_pdf_dirty,
+)
+from ..utils.dates import parse_iso_date
 
 
 bp = Blueprint("inventarios", __name__)
@@ -69,6 +75,34 @@ def editar_nombre_inventario(id):
         )
 
     flash("Nombre del inventario actualizado.", "success")
+    return redirect(
+        url_for("inmuebles.ver_inmueble", id=inmueble_id) + "#inventarios-registrados"
+    )
+
+
+@bp.route(
+    "/editar_fecha_inventario/<int:id>",
+    methods=["POST"],
+    endpoint="editar_fecha_inventario",
+)
+@login_required
+def editar_fecha_inventario(id):
+    require_edit_permission()
+    inventario = get_inventario_for_current_company_or_404(id)
+    inmueble_id = inventario.inmueble_id
+    fecha = parse_iso_date(request.form.get("fecha", ""))
+
+    if not fecha:
+        flash("La fecha del inventario no es valida.", "error")
+        return redirect(
+            url_for("inmuebles.ver_inmueble", id=inmueble_id)
+            + "#inventarios-registrados"
+        )
+
+    inventario.fecha = fecha
+    mark_inventory_pdf_dirty(inventario)
+    db.session.commit()
+    flash("Fecha del inventario actualizada.", "success")
     return redirect(
         url_for("inmuebles.ver_inmueble", id=inmueble_id) + "#inventarios-registrados"
     )

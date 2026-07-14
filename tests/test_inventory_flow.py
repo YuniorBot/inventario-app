@@ -1,3 +1,5 @@
+from datetime import date
+
 from inventario_app.extensions import db
 from inventario_app.models import Foto, Inmueble, Inventario, Observacion, Seccion
 from inventario_app.services.media_service import get_upload_object_key
@@ -69,6 +71,29 @@ def test_admin_can_edit_inmueble_owner(client, login, seeded_data, app):
         assert inventario.pdf_filename is None
 
 
+def test_admin_can_edit_inmueble_reception_date(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        seeded_data["inventario_a"].pdf_status = "ready"
+        seeded_data["inventario_a"].pdf_filename = "inventario_1.pdf"
+        db.session.commit()
+
+    response = client.post(
+        f"/editar_fecha_recepcion_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"fecha_recepcion": "2026-05-20"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inmueble.fecha_recepcion == date(2026, 5, 20)
+        assert inventario.pdf_status == "not_started"
+        assert inventario.pdf_filename is None
+
+
 def test_empty_inmueble_address_is_rejected(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 
@@ -97,6 +122,23 @@ def test_empty_inmueble_owner_is_rejected(client, login, seeded_data, app):
     with app.app_context():
         inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
         assert inmueble.propietario == "Owner"
+
+
+def test_invalid_inmueble_reception_date_is_rejected(
+    client, login, seeded_data, app
+):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_recepcion_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"fecha_recepcion": "fecha-invalida"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inmueble = db.session.get(Inmueble, seeded_data["inmueble_a"].id)
+        assert inmueble.fecha_recepcion == date(2026, 4, 1)
 
 
 def test_admin_can_create_inventory_with_default_sections(
@@ -144,6 +186,28 @@ def test_admin_can_edit_inventory_name(client, login, seeded_data, app):
         assert inventario.nombre == "Inventario actualizado"
 
 
+def test_admin_can_edit_inventory_date(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        seeded_data["inventario_a"].pdf_status = "ready"
+        seeded_data["inventario_a"].pdf_filename = "inventario_1.pdf"
+        db.session.commit()
+
+    response = client.post(
+        f"/editar_fecha_inventario/{seeded_data['inventario_a'].id}",
+        data={"fecha": "2026-06-15"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.fecha == date(2026, 6, 15)
+        assert inventario.pdf_status == "not_started"
+        assert inventario.pdf_filename is None
+
+
 def test_empty_inventory_name_is_rejected(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 
@@ -157,6 +221,21 @@ def test_empty_inventory_name_is_rejected(client, login, seeded_data, app):
     with app.app_context():
         inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
         assert inventario.nombre == "Entrega inicial"
+
+
+def test_invalid_inventory_date_is_rejected(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_inventario/{seeded_data['inventario_a'].id}",
+        data={"fecha": "fecha-invalida"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert inventario.fecha == date(2026, 4, 2)
 
 
 def test_admin_can_duplicate_inventory_structure_only(client, login, seeded_data, app):

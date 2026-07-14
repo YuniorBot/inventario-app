@@ -107,6 +107,16 @@
       <article class="workflow-step compact-step">
         <strong>Fecha de recepcion</strong>
         <p>{{ inmueble.fecha_recepcion }}</p>
+        {% if can_edit %}
+        <form action="/editar_fecha_recepcion_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div>
+            <label for="fecha-recepcion-inmueble">Editar fecha de recepcion</label>
+            <input id="fecha-recepcion-inmueble" type="date" name="fecha_recepcion" value="{{ inmueble.fecha_recepcion }}" required>
+          </div>
+          <button type="submit" class="button button-secondary">Actualizar fecha</button>
+        </form>
+        {% endif %}
       </article>
     </div>
   </aside>
@@ -150,6 +160,16 @@
         {% endif %}
         <span class="chip">Token publico activo</span>
       </div>
+      {% if can_edit %}
+      <form action="/editar_fecha_inventario/{{ inv.id }}" method="POST" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label for="fecha-inventario-{{ inv.id }}">Editar fecha del inventario</label>
+          <input id="fecha-inventario-{{ inv.id }}" type="date" name="fecha" value="{{ inv.fecha }}" required>
+        </div>
+        <button type="submit" class="button button-secondary">Actualizar fecha</button>
+      </form>
+      {% endif %}
       <div class="card-actions">
         <a class="button" href="/inventario/{{ inv.id }}">Entrar al inventario</a>
         {% if can_edit %}

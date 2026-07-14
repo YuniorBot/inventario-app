@@ -39,6 +39,17 @@ def test_viewer_cannot_edit_inmueble_owner(client, login, seeded_data):
     assert response.status_code == 403
 
 
+def test_viewer_cannot_edit_inmueble_reception_date(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_recepcion_inmueble/{seeded_data['inmueble_a'].id}",
+        data={"fecha_recepcion": "2026-05-20"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_editor_cannot_open_user_admin_panel(client, login, seeded_data):
     login(seeded_data["editor_a"].email)
 
@@ -77,6 +88,19 @@ def test_admin_cannot_edit_other_company_inmueble_owner(client, login, seeded_da
     assert response.status_code == 403
 
 
+def test_admin_cannot_edit_other_company_inmueble_reception_date(
+    client, login, seeded_data
+):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_recepcion_inmueble/{seeded_data['inmueble_b'].id}",
+        data={"fecha_recepcion": "2026-05-20"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_viewer_cannot_edit_inventory_name(client, login, seeded_data):
     login(seeded_data["viewer_a"].email)
 
@@ -88,12 +112,34 @@ def test_viewer_cannot_edit_inventory_name(client, login, seeded_data):
     assert response.status_code == 403
 
 
+def test_viewer_cannot_edit_inventory_date(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_inventario/{seeded_data['inventario_a'].id}",
+        data={"fecha": "2026-06-15"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_admin_cannot_edit_other_company_inventory_name(client, login, seeded_data):
     login(seeded_data["admin_a"].email)
 
     response = client.post(
         f"/editar_nombre_inventario/{seeded_data['inventario_b'].id}",
         data={"nombre": "Cambio cruzado"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_edit_other_company_inventory_date(client, login, seeded_data):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/editar_fecha_inventario/{seeded_data['inventario_b'].id}",
+        data={"fecha": "2026-06-15"},
     )
 
     assert response.status_code == 403
