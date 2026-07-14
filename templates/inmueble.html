@@ -111,7 +111,7 @@
         <button type="button" class="button button-secondary" data-reception-date-edit-toggle="{{ inmueble.id }}">
           Actualizar fecha
         </button>
-        <form action="/editar_fecha_recepcion_inmueble/{{ inmueble.id }}" method="POST" class="stack" id="reception-date-form-{{ inmueble.id }}" hidden>
+        <form action="/editar_fecha_recepcion_inmueble/{{ inmueble.id }}" method="POST" class="stack reception-date-form" id="reception-date-form-{{ inmueble.id }}" hidden>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div>
             <label for="fecha-recepcion-inmueble">Editar fecha de recepcion</label>
@@ -167,7 +167,7 @@
         <span class="chip">Token publico activo</span>
       </div>
       {% if can_edit %}
-      <form action="/editar_fecha_inventario/{{ inv.id }}" method="POST" class="stack" id="inventory-date-form-{{ inv.id }}" hidden>
+      <form action="/editar_fecha_inventario/{{ inv.id }}" method="POST" class="stack inventory-date-form" id="inventory-date-form-{{ inv.id }}" hidden>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label for="fecha-inventario-{{ inv.id }}">Editar fecha del inventario</label>

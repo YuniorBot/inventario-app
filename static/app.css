@@ -1685,6 +1685,11 @@ select:focus-visible {
   display: none;
 }
 
+.reception-date-form[hidden],
+.inventory-date-form[hidden] {
+  display: none;
+}
+
 .inventory-name-form .button {
   min-height: 40px;
   padding: 0.65rem 1rem;
