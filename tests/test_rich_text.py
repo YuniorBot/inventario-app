@@ -1,3 +1,5 @@
+import re
+
 from inventario_app.extensions import db
 from inventario_app.models import Observacion, Seccion
 from inventario_app.utils.rich_text import (
@@ -120,7 +122,7 @@ def test_section_editors_render_as_collapsible_panels(
     assert 'data-editor-toggle="new-observation-editor-panel"' in body
     assert f'data-editor-toggle="observation-editor-panel-{observacion_id}"' in body
     assert f'data-editor-cancel="observation-editor-panel-{observacion_id}"' in body
-    assert "/static/rich-text-editor.js" in body
+    assert re.search(r'/static/rich-text-editor\.js\?v=\d+', body)
 
 
 def test_viewer_does_not_receive_editor_controls(client, login, seeded_data):
@@ -132,3 +134,11 @@ def test_viewer_does_not_receive_editor_controls(client, login, seeded_data):
     assert "data-editor-toggle" not in body
     assert "data-editor-panel" not in body
     assert "/static/rich-text-editor.js" not in body
+
+
+def test_stylesheet_url_is_versioned(client):
+    response = client.get("/login")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert re.search(r'/static/app\.css\?v=\d+', body)

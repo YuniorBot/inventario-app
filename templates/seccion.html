@@ -283,9 +283,9 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/gallery-viewer.js"></script>
+<script src="{{ versioned_static('gallery-viewer.js') }}"></script>
 {% if can_edit %}
-<script src="/static/rich-text-editor.js"></script>
+<script src="{{ versioned_static('rich-text-editor.js') }}"></script>
 <script>
   ;(() => {
     const form = document.getElementById("upload-form")

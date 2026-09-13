@@ -54,6 +54,16 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     login_manager.login_message = "Debes iniciar sesion para continuar."
     app.jinja_env.filters["rich_text"] = rich_text_markup
 
+    def versioned_static(filename: str) -> str:
+        static_path = Path(app.static_folder) / filename
+        try:
+            version = static_path.stat().st_mtime_ns
+        except OSError:
+            return url_for("static", filename=filename)
+        return url_for("static", filename=filename, v=version)
+
+    app.jinja_env.globals["versioned_static"] = versioned_static
+
     if not os.environ.get("SECRET_KEY"):
         app.logger.warning(
             "Usando SECRET_KEY de desarrollo. Configura SECRET_KEY para entornos compartidos o produccion."

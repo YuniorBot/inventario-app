@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{ versioned_static('app.css') }}">
   <style>
     .public-media-frame {
       aspect-ratio: 4 / 3;
@@ -144,6 +144,6 @@
 
   {% set gallery_item_label = "Archivo" %}
   {% include "partials/gallery_viewer.html" %}
-  <script src="/static/gallery-viewer.js"></script>
+  <script src="{{ versioned_static('gallery-viewer.js') }}"></script>
 </body>
 </html>
