@@ -295,6 +295,31 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.editor-summary {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.editor-summary .muted {
+  margin: 0;
+}
+
+.editor-trigger {
+  margin-top: 1rem;
+}
+
+.collapsible-editor-panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.collapsible-editor-panel[hidden] {
+  display: none;
+}
+
 .layout {
   display: block;
   min-height: 100vh;
@@ -1783,6 +1808,20 @@ select:focus-visible {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
+}
+
+.observation-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.observation-control-row .inline-form {
+  display: inline-flex;
+}
+
+.observation-control-row .button {
+  width: auto;
 }
 
 .observation-edit-form textarea {

@@ -96,3 +96,39 @@ def test_observation_accepts_sanitized_rich_text(client, login, seeded_data, app
             seccion_id=seeded_data["seccion_a"].id
         ).one()
         assert observacion.comentario == "<ul><li><em>Pintura</em></li></ul>"
+
+
+def test_section_editors_render_as_collapsible_panels(
+    client, login, seeded_data, app
+):
+    with app.app_context():
+        observacion = Observacion(
+            seccion_id=seeded_data["seccion_a"].id,
+            comentario="Detalle editable",
+        )
+        db.session.add(observacion)
+        db.session.commit()
+        observacion_id = observacion.id
+
+    login(seeded_data["admin_a"].email)
+    response = client.get(f"/seccion/{seeded_data['seccion_a'].id}")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'data-editor-toggle="description-editor-panel"' in body
+    assert 'id="description-editor-panel"' in body
+    assert 'data-editor-toggle="new-observation-editor-panel"' in body
+    assert f'data-editor-toggle="observation-editor-panel-{observacion_id}"' in body
+    assert f'data-editor-cancel="observation-editor-panel-{observacion_id}"' in body
+    assert "/static/rich-text-editor.js" in body
+
+
+def test_viewer_does_not_receive_editor_controls(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+    response = client.get(f"/seccion/{seeded_data['seccion_a'].id}")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "data-editor-toggle" not in body
+    assert "data-editor-panel" not in body
+    assert "/static/rich-text-editor.js" not in body

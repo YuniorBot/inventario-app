@@ -153,7 +153,24 @@
     <h3>Descripción</h3>
     {% if can_edit %}
     <p class="muted">Guarda una descripción general de la sección para que aparezca en el PDF antes de las observaciones.</p>
-    <form action="/guardar_descripcion/{{ seccion.id }}" method="POST" class="stack">
+    <div class="editor-summary">
+      {% if seccion.descripcion %}
+      <div class="rich-text-content">{{ seccion.descripcion|rich_text }}</div>
+      {% else %}
+      <p class="muted">No hay descripción registrada para esta sección.</p>
+      {% endif %}
+    </div>
+    <button
+      type="button"
+      class="button button-secondary editor-trigger"
+      data-editor-toggle="description-editor-panel"
+      aria-controls="description-editor-panel"
+      aria-expanded="false"
+      hidden
+    >
+      {{ 'Editar descripción' if seccion.descripcion else 'Agregar descripción' }}
+    </button>
+    <form id="description-editor-panel" action="/guardar_descripcion/{{ seccion.id }}" method="POST" class="stack collapsible-editor-panel" data-editor-panel>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
         <label for="descripcion">Descripción</label>
@@ -161,6 +178,7 @@
       </div>
       <div class="inline-actions">
         <button type="submit">Guardar descripción</button>
+        <button type="button" class="button button-secondary" data-editor-cancel="description-editor-panel" hidden>Cancelar</button>
       </div>
     </form>
     {% elif seccion.descripcion %}
@@ -173,7 +191,18 @@
   {% if can_edit %}
   <aside class="form-card fade-in delay-2">
     <h3>Agregar observación</h3>
-    <form action="/crear_observacion/{{ seccion.id }}" method="POST" class="stack">
+    <p class="muted">Registra hallazgos o detalles adicionales de esta sección.</p>
+    <button
+      type="button"
+      class="button button-secondary editor-trigger"
+      data-editor-toggle="new-observation-editor-panel"
+      aria-controls="new-observation-editor-panel"
+      aria-expanded="false"
+      hidden
+    >
+      Agregar observación
+    </button>
+    <form id="new-observation-editor-panel" action="/crear_observacion/{{ seccion.id }}" method="POST" class="stack collapsible-editor-panel" data-editor-panel>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
         <label for="comentario">Comentario</label>
@@ -181,6 +210,7 @@
       </div>
       <div class="inline-actions">
         <button type="submit">Guardar observación</button>
+        <button type="button" class="button button-secondary" data-editor-cancel="new-observation-editor-panel" hidden>Cancelar</button>
       </div>
     </form>
   </aside>
@@ -208,7 +238,26 @@
         <div class="rich-text-content">{{ o.comentario|rich_text }}</div>
         {% if can_edit %}
         <div class="observation-actions">
-          <form action="/editar_observacion/{{ o.id }}" method="POST" class="stack observation-edit-form">
+          <div class="observation-control-row">
+            <button
+              type="button"
+              class="button button-secondary"
+              data-editor-toggle="observation-editor-panel-{{ o.id }}"
+              aria-controls="observation-editor-panel-{{ o.id }}"
+              aria-expanded="false"
+              hidden
+            >
+              Editar
+            </button>
+            <form action="/eliminar_observacion/{{ o.id }}" method="POST" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="button button-danger" onclick="return confirm('¿Eliminar esta observación?')">
+                Eliminar
+              </button>
+            </form>
+          </div>
+
+          <form id="observation-editor-panel-{{ o.id }}" action="/editar_observacion/{{ o.id }}" method="POST" class="stack observation-edit-form collapsible-editor-panel" data-editor-panel>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
               <label for="comentario-observacion-{{ o.id }}">Editar observación</label>
@@ -216,14 +265,8 @@
             </div>
             <div class="inline-actions">
               <button type="submit">Guardar cambios</button>
+              <button type="button" class="button button-secondary" data-editor-cancel="observation-editor-panel-{{ o.id }}" hidden>Cancelar</button>
             </div>
-          </form>
-
-          <form action="/eliminar_observacion/{{ o.id }}" method="POST" class="inline-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="button button-danger" onclick="return confirm('¿Eliminar esta observación?')">
-              Eliminar
-            </button>
           </form>
         </div>
         {% endif %}
