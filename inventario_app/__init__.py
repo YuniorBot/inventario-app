@@ -29,6 +29,7 @@ from .services.access import (
 )
 from .services.bootstrap_service import seed_initial_data
 from .services.media_service import ensure_storage_dirs, validate_storage_config
+from .utils.rich_text import rich_text_markup
 
 
 def create_app(config_overrides: dict | None = None) -> Flask:
@@ -51,6 +52,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     migrate.init_app(app, db)
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Debes iniciar sesion para continuar."
+    app.jinja_env.filters["rich_text"] = rich_text_markup
 
     if not os.environ.get("SECRET_KEY"):
         app.logger.warning(

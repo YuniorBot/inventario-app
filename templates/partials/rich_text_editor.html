@@ -1,0 +1,37 @@
+{% macro rich_text_editor(id, name, value='', placeholder='', compact=false) %}
+<div class="rich-text-field{% if compact %} rich-text-field-compact{% endif %}" data-rich-text>
+  <div class="rich-text-toolbar" role="toolbar" aria-label="Formato de texto" hidden>
+    <button type="button" class="rich-text-tool" data-command="bold" aria-label="Negrita" aria-pressed="false" title="Negrita">
+      <strong>B</strong>
+    </button>
+    <button type="button" class="rich-text-tool" data-command="italic" aria-label="Cursiva" aria-pressed="false" title="Cursiva">
+      <em>I</em>
+    </button>
+    <button type="button" class="rich-text-tool" data-command="underline" aria-label="Subrayado" aria-pressed="false" title="Subrayado">
+      <u>U</u>
+    </button>
+    <span class="rich-text-divider" aria-hidden="true"></span>
+    <button type="button" class="rich-text-tool rich-text-tool-wide" data-command="insertUnorderedList" aria-label="Lista con viñetas" aria-pressed="false" title="Lista con viñetas">
+      <span aria-hidden="true">• Lista</span>
+    </button>
+    <button type="button" class="rich-text-tool rich-text-tool-wide" data-command="insertOrderedList" aria-label="Lista numerada" aria-pressed="false" title="Lista numerada">
+      <span aria-hidden="true">1. Lista</span>
+    </button>
+    <span class="rich-text-divider" aria-hidden="true"></span>
+    <button type="button" class="rich-text-tool rich-text-tool-wide" data-command="removeFormat" aria-label="Quitar formato" title="Quitar formato">
+      Limpiar
+    </button>
+  </div>
+  <textarea id="{{ id }}" class="rich-text-input" name="{{ name }}" autocomplete="off" placeholder="{{ placeholder }}">{{ value|rich_text }}</textarea>
+  <div
+    id="{{ id }}-editor"
+    class="rich-text-editor rich-text-content"
+    contenteditable="true"
+    role="textbox"
+    aria-multiline="true"
+    aria-label="{{ placeholder }}"
+    data-placeholder="{{ placeholder }}"
+    hidden
+  ></div>
+</div>
+{% endmacro %}

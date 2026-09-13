@@ -16,6 +16,7 @@ from reportlab.platypus import (
     Spacer,
 )
 from .media_service import upload_pdf_file
+from ..utils.rich_text import rich_text_to_reportlab
 
 
 def build_inventory_pdf(inventario, secciones, firmas) -> str:
@@ -121,14 +122,19 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
 
             descripcion = (seccion.descripcion or "").strip()
             if descripcion:
-                elementos.append(Paragraph(_label_value("Descripcion", descripcion), meta_style))
+                elementos.append(
+                    Paragraph(_label_rich_value("Descripcion", descripcion), meta_style)
+                )
                 elementos.append(Spacer(1, 10))
 
             tiene_observaciones = False
             for observacion in seccion.observaciones:
                 tiene_observaciones = True
                 elementos.append(
-                    Paragraph(_label_value("Observacion", observacion.comentario), meta_style)
+                    Paragraph(
+                        _label_rich_value("Observacion", observacion.comentario),
+                        meta_style,
+                    )
                 )
                 elementos.append(Spacer(1, 10))
 
@@ -191,3 +197,7 @@ def _safe_text(value) -> str:
 
 def _label_value(label: str, value) -> str:
     return f"<b>{escape(label)}:</b> {_safe_text(value)}"
+
+
+def _label_rich_value(label: str, value) -> str:
+    return f"<b>{escape(label)}:</b> {rich_text_to_reportlab(value)}"

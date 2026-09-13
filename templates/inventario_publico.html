@@ -103,7 +103,7 @@
           {% if s.descripcion %}
           <article class="observation-card">
             <strong>Descripción</strong>
-            <p>{{ s.descripcion }}</p>
+            <div class="rich-text-content">{{ s.descripcion|rich_text }}</div>
           </article>
           {% else %}
           <div class="empty-state">
@@ -116,7 +116,7 @@
           {% if s.observaciones %}
             {% for obs in s.observaciones %}
             <article class="observation-card">
-              <p>{{ obs.comentario }}</p>
+              <div class="rich-text-content">{{ obs.comentario|rich_text }}</div>
             </article>
             {% endfor %}
           {% else %}

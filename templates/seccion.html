@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/rich_text_editor.html" import rich_text_editor %}
 
 {% block title %}{{ seccion.nombre }} | Inventario App{% endblock %}
 
@@ -156,14 +157,14 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
         <label for="descripcion">Descripción</label>
-        <textarea id="descripcion" name="descripcion" autocomplete="off" placeholder="Ej. Estado general del baño, acabados, accesorios y detalles relevantes…">{{ seccion.descripcion or '' }}</textarea>
+        {{ rich_text_editor('descripcion', 'descripcion', seccion.descripcion or '', 'Ej. Estado general del baño, acabados, accesorios y detalles relevantes…') }}
       </div>
       <div class="inline-actions">
         <button type="submit">Guardar descripción</button>
       </div>
     </form>
     {% elif seccion.descripcion %}
-    <p>{{ seccion.descripcion }}</p>
+    <div class="rich-text-content">{{ seccion.descripcion|rich_text }}</div>
     {% else %}
     <p class="muted">No hay descripción registrada para esta sección.</p>
     {% endif %}
@@ -176,7 +177,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
         <label for="comentario">Comentario</label>
-        <textarea id="comentario" name="comentario" autocomplete="off" placeholder="Ej. Se evidencia desgaste en pintura o pendiente de reparación…"></textarea>
+        {{ rich_text_editor('comentario', 'comentario', '', 'Ej. Se evidencia desgaste en pintura o pendiente de reparación…', true) }}
       </div>
       <div class="inline-actions">
         <button type="submit">Guardar observación</button>
@@ -204,14 +205,14 @@
     <div class="stack observation-stack">
       {% for o in observaciones %}
       <article class="observation-card">
-        <p>{{ o.comentario }}</p>
+        <div class="rich-text-content">{{ o.comentario|rich_text }}</div>
         {% if can_edit %}
         <div class="observation-actions">
           <form action="/editar_observacion/{{ o.id }}" method="POST" class="stack observation-edit-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
               <label for="comentario-observacion-{{ o.id }}">Editar observación</label>
-              <textarea id="comentario-observacion-{{ o.id }}" name="comentario" autocomplete="off">{{ o.comentario }}</textarea>
+              {{ rich_text_editor('comentario-observacion-' ~ o.id, 'comentario', o.comentario, 'Edita la observación…', true) }}
             </div>
             <div class="inline-actions">
               <button type="submit">Guardar cambios</button>
@@ -241,6 +242,7 @@
 {% block scripts %}
 <script src="/static/gallery-viewer.js"></script>
 {% if can_edit %}
+<script src="/static/rich-text-editor.js"></script>
 <script>
   ;(() => {
     const form = document.getElementById("upload-form")

@@ -3,6 +3,7 @@ Flask-SQLAlchemy
 Flask-Login
 Flask-WTF
 Flask-Migrate
+bleach
 boto3
 psycopg[binary]
 pytest

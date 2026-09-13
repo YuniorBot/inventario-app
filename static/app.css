@@ -182,6 +182,119 @@ textarea {
   resize: vertical;
 }
 
+.rich-text-field {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.rich-text-field:focus-within {
+  border-color: rgba(23, 23, 23, 0.24);
+  box-shadow: 0 0 0 4px rgba(23, 23, 23, 0.07);
+}
+
+.rich-text-field .rich-text-input {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rich-text-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(238, 243, 252, 0.82);
+  scrollbar-width: thin;
+}
+
+.rich-text-toolbar[hidden],
+.rich-text-editor[hidden] {
+  display: none;
+}
+
+.rich-text-toolbar .rich-text-tool {
+  flex: 0 0 auto;
+  width: 2.15rem;
+  min-height: 2.15rem;
+  padding: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+
+.rich-text-toolbar .rich-text-tool-wide {
+  width: auto;
+  padding-inline: 0.65rem;
+}
+
+.rich-text-toolbar .rich-text-tool:hover,
+.rich-text-toolbar .rich-text-tool.is-active {
+  transform: none;
+  border-color: rgba(21, 51, 133, 0.18);
+  background: rgba(21, 51, 133, 0.1);
+  color: var(--accent);
+  box-shadow: none;
+}
+
+.rich-text-divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  margin: 0.2rem 0.15rem;
+  background: var(--line);
+}
+
+.rich-text-editor {
+  min-height: 174px;
+  padding: 0.95rem 1rem;
+  outline: 0;
+  overflow-wrap: anywhere;
+}
+
+.rich-text-field-compact .rich-text-editor,
+.observation-edit-form .rich-text-editor {
+  min-height: 96px;
+}
+
+.rich-text-editor:empty::before {
+  color: #7a7a7a;
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.rich-text-content {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.rich-text-content p {
+  margin: 0 0 0.65rem;
+}
+
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0.4rem 0 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.rich-text-content li + li {
+  margin-top: 0.2rem;
+}
+
 .layout {
   display: block;
   min-height: 100vh;
@@ -1098,6 +1211,14 @@ textarea {
   button,
   .button {
     width: 100%;
+  }
+
+  .rich-text-toolbar .rich-text-tool {
+    width: 2.15rem;
+  }
+
+  .rich-text-toolbar .rich-text-tool-wide {
+    width: auto;
   }
 
   .hero-copy h1,

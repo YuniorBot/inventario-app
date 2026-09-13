@@ -21,6 +21,7 @@ from ..services.media_service import (
 from ..services.pdf_queue_service import mark_inventory_pdf_dirty
 from ..services.video_queue_service import enqueue_video_processing
 from ..utils.files import VIDEO_EXTENSIONS, is_video_filename, unique_filename, validate_uploaded_file
+from ..utils.rich_text import rich_text_has_content, sanitize_rich_text
 
 
 @dataclass
@@ -44,7 +45,8 @@ class VideoUploadCompletionResult:
 
 
 def save_section_description(seccion: Seccion, descripcion: str) -> None:
-    seccion.descripcion = descripcion.strip() or None
+    descripcion = sanitize_rich_text(descripcion)
+    seccion.descripcion = descripcion if rich_text_has_content(descripcion) else None
     mark_inventory_pdf_dirty(seccion.inventario)
     db.session.commit()
     current_app.logger.info("descripcion_updated seccion_id=%s", seccion.id)
@@ -201,8 +203,8 @@ def delete_section_photo(foto: Foto) -> int:
 
 
 def create_section_observation(seccion: Seccion, comentario: str) -> bool:
-    comentario = comentario.strip()
-    if not comentario:
+    comentario = sanitize_rich_text(comentario)
+    if not rich_text_has_content(comentario):
         return False
 
     db.session.add(Observacion(seccion_id=seccion.id, comentario=comentario))
@@ -213,8 +215,8 @@ def create_section_observation(seccion: Seccion, comentario: str) -> bool:
 
 
 def update_section_observation(observacion: Observacion, comentario: str) -> bool:
-    comentario = comentario.strip()
-    if not comentario:
+    comentario = sanitize_rich_text(comentario)
+    if not rich_text_has_content(comentario):
         return False
 
     observacion.comentario = comentario
