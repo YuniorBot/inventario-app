@@ -108,6 +108,17 @@
       <h2>Secciones del recorrido</h2>
       <p>Administra cada ambiente y entra a su galeria de archivos, observaciones y evidencia de soporte.</p>
     </div>
+    {% if can_edit and secciones %}
+    <form
+      action="{{ url_for('secciones.limpiar_secciones', id=inventario.id) }}"
+      method="POST"
+      class="inline-form"
+      onsubmit="return confirm('Se eliminarán {{ secciones|length }} secciones y todo su contenido. Esta acción no se puede deshacer.')"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button button-danger">Limpiar secciones</button>
+    </form>
+    {% endif %}
   </div>
 
   {% if secciones %}

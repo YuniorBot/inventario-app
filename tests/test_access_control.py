@@ -161,6 +161,29 @@ def test_admin_cannot_duplicate_other_company_inventory(client, login, seeded_da
     assert response.status_code == 403
 
 
+def test_viewer_cannot_clear_inventory_sections(client, login, seeded_data):
+    login(seeded_data["viewer_a"].email)
+
+    page = client.get(f"/inventario/{seeded_data['inventario_a'].id}")
+    assert "/limpiar_secciones/" not in page.get_data(as_text=True)
+
+    response = client.post(
+        f"/limpiar_secciones/{seeded_data['inventario_a'].id}"
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_cannot_clear_other_company_inventory(client, login, seeded_data):
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/limpiar_secciones/{seeded_data['inventario_b'].id}"
+    )
+
+    assert response.status_code == 403
+
+
 def test_viewer_cannot_edit_observation(client, login, seeded_data, app):
     login(seeded_data["viewer_a"].email)
 

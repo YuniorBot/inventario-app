@@ -8,7 +8,7 @@ from ..constants import (
     VIDEO_STATUS_READY,
 )
 from ..extensions import db
-from ..models import Foto, Observacion, Seccion
+from ..models import Foto, Inventario, Observacion, Seccion
 from ..services.media_service import (
     MediaProcessingError,
     build_relative_upload_key,
@@ -253,13 +253,48 @@ def create_inventory_section(inventario_id: int, nombre: str) -> bool:
 
 def delete_inventory_section(seccion: Seccion) -> int:
     inventario_id = seccion.inventario_id
-    archivos = [foto.archivo for foto in seccion.fotos]
+    archivos = _uploaded_files_for_sections([seccion])
     mark_inventory_pdf_dirty(seccion.inventario)
     db.session.delete(seccion)
     db.session.commit()
     for archivo in archivos:
         delete_uploaded_file(archivo)
     return inventario_id
+
+
+def delete_all_inventory_sections(inventario: Inventario) -> int:
+    db.session.refresh(inventario)
+    secciones = list(inventario.secciones)
+    archivos = _uploaded_files_for_sections(secciones)
+    deleted_count = len(secciones)
+
+    if not deleted_count:
+        return 0
+
+    for seccion in secciones:
+        db.session.delete(seccion)
+    mark_inventory_pdf_dirty(inventario)
+    db.session.commit()
+
+    for archivo in archivos:
+        delete_uploaded_file(archivo)
+
+    current_app.logger.info(
+        "inventario_sections_deleted inventario_id=%s count=%s",
+        inventario.id,
+        deleted_count,
+    )
+    return deleted_count
+
+
+def _uploaded_files_for_sections(secciones: list[Seccion]) -> set[str]:
+    return {
+        archivo
+        for seccion in secciones
+        for foto in seccion.fotos
+        for archivo in (foto.archivo, foto.archivo_original)
+        if archivo
+    }
 
 
 def rename_section(seccion: Seccion, nombre: str) -> bool:

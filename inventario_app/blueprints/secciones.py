@@ -23,6 +23,7 @@ from ..services.section_service import (
     create_inventory_section,
     create_section_observation,
     complete_direct_video_upload,
+    delete_all_inventory_sections,
     delete_inventory_section,
     delete_section_observation,
     delete_section_photo,
@@ -196,6 +197,21 @@ def eliminar_seccion(id):
     inventario_id = delete_inventory_section(seccion)
     flash("Seccion eliminada.", "success")
     return redirect(url_for("inventarios.ver_inventario", id=inventario_id))
+
+
+@bp.route(
+    "/limpiar_secciones/<int:id>", methods=["POST"], endpoint="limpiar_secciones"
+)
+@login_required
+def limpiar_secciones(id):
+    require_edit_permission()
+    inventario = get_inventario_for_current_company_or_404(id)
+    deleted_count = delete_all_inventory_sections(inventario)
+    if deleted_count:
+        flash(f"Se eliminaron {deleted_count} secciones y todo su contenido.", "success")
+    else:
+        flash("El inventario no tiene secciones para eliminar.", "info")
+    return redirect(url_for("inventarios.ver_inventario", id=id))
 
 
 @bp.route(

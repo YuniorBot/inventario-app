@@ -1,7 +1,7 @@
 from datetime import date
 
 from inventario_app.extensions import db
-from inventario_app.models import Foto, Inmueble, Inventario, Observacion, Seccion
+from inventario_app.models import Firma, Foto, Inmueble, Inventario, Observacion, Seccion
 from inventario_app.services.media_service import get_upload_object_key
 
 
@@ -422,17 +422,25 @@ def test_deleting_section_removes_uploaded_files(client, login, seeded_data, app
     login(seeded_data["admin_a"].email)
 
     with app.app_context():
-        foto = Foto(seccion_id=seeded_data["seccion_a"].id, archivo="temporal.png")
+        foto = Foto(
+            seccion_id=seeded_data["seccion_a"].id,
+            archivo="videos/processed/temporal.mp4",
+            archivo_original="videos/originals/temporal.mov",
+        )
         db.session.add(foto)
         db.session.commit()
 
-    object_key = get_upload_object_key("temporal.png")
-    app.extensions["s3_client"].put_object(
-        Bucket=app.config["S3_BUCKET_NAME"],
-        Key=object_key,
-        Body=b"temporary file",
-        ContentType="image/png",
-    )
+    object_keys = {
+        get_upload_object_key("videos/processed/temporal.mp4"),
+        get_upload_object_key("videos/originals/temporal.mov"),
+    }
+    for object_key in object_keys:
+        app.extensions["s3_client"].put_object(
+            Bucket=app.config["S3_BUCKET_NAME"],
+            Key=object_key,
+            Body=b"temporary file",
+            ContentType="video/mp4",
+        )
 
     response = client.post(
         f"/eliminar_seccion/{seeded_data['seccion_a'].id}",
@@ -440,10 +448,115 @@ def test_deleting_section_removes_uploaded_files(client, login, seeded_data, app
     )
 
     assert response.status_code == 302
-    assert (app.config["S3_BUCKET_NAME"], object_key) not in app.extensions["s3_client"].objects
+    for object_key in object_keys:
+        assert (
+            app.config["S3_BUCKET_NAME"],
+            object_key,
+        ) not in app.extensions["s3_client"].objects
     with app.app_context():
         assert db.session.get(Seccion, seeded_data["seccion_a"].id) is None
         assert Foto.query.filter_by(seccion_id=seeded_data["seccion_a"].id).count() == 0
+
+
+def test_admin_can_clear_inventory_sections_and_create_new_ones(
+    client, login, seeded_data, app
+):
+    login(seeded_data["admin_a"].email)
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        inventario.pdf_status = "ready"
+        inventario.pdf_filename = f"inventario_{inventario.id}.pdf"
+        second_section = Seccion(inventario_id=inventario.id, nombre="Cocina")
+        other_company_section = Seccion(
+            inventario_id=seeded_data["inventario_b"].id,
+            nombre="Sala B",
+        )
+        db.session.add_all([second_section, other_company_section])
+        db.session.flush()
+        observation = Observacion(
+            seccion_id=second_section.id,
+            comentario="Contenido que debe eliminarse",
+        )
+        photo = Foto(
+            seccion_id=second_section.id,
+            archivo="videos/processed/clean-me.mp4",
+            archivo_original="videos/originals/clean-me.mov",
+        )
+        signature = Firma(
+            inventario_id=inventario.id,
+            nombre="Firma conservada",
+            imagen="data:image/png;base64,AA==",
+        )
+        db.session.add_all([observation, photo, signature])
+        db.session.commit()
+        other_company_section_id = other_company_section.id
+        observation_id = observation.id
+        photo_id = photo.id
+        signature_id = signature.id
+        db.session.expire_all()
+
+    filenames = {
+        "videos/processed/clean-me.mp4",
+        "videos/originals/clean-me.mov",
+    }
+    for filename in filenames:
+        app.extensions["s3_client"].put_object(
+            Bucket=app.config["S3_BUCKET_NAME"],
+            Key=get_upload_object_key(filename),
+            Body=b"video",
+            ContentType="video/mp4",
+        )
+
+    page = client.get(f"/inventario/{seeded_data['inventario_a'].id}")
+    body = page.get_data(as_text=True)
+    assert f"/limpiar_secciones/{seeded_data['inventario_a'].id}" in body
+    assert "Se eliminarán 2 secciones y todo su contenido." in body
+    with app.app_context():
+        db.session.expire_all()
+        assert (
+            db.session.get(Inventario, seeded_data["inventario_a"].id).pdf_status
+            == "ready"
+        )
+
+    response = client.post(
+        f"/limpiar_secciones/{seeded_data['inventario_a'].id}",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        db.session.expire_all()
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        assert Seccion.query.filter_by(inventario_id=inventario.id).count() == 0
+        assert db.session.get(Seccion, other_company_section_id) is not None
+        assert db.session.get(Observacion, observation_id) is None
+        assert db.session.get(Foto, photo_id) is None
+        assert db.session.get(Firma, signature_id) is not None
+        assert inventario.pdf_status == "not_started"
+        assert inventario.pdf_filename is None
+
+    for filename in filenames:
+        assert (
+            app.config["S3_BUCKET_NAME"],
+            get_upload_object_key(filename),
+        ) not in app.extensions["s3_client"].objects
+
+    create_response = client.post(
+        f"/crear_seccion/{seeded_data['inventario_a'].id}",
+        data={"nombre": "Nueva sala"},
+        follow_redirects=False,
+    )
+
+    assert create_response.status_code == 302
+    with app.app_context():
+        assert (
+            Seccion.query.filter_by(
+                inventario_id=seeded_data["inventario_a"].id,
+                nombre="Nueva sala",
+            ).count()
+            == 1
+        )
 
 
 def test_viewer_can_open_inventory_without_signature_canvas(client, login, seeded_data):
