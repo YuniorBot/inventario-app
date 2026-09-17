@@ -7,6 +7,133 @@
     "insertOrderedList",
   ])
 
+  const clipboardTagMap = new Map([
+    ["b", "strong"],
+    ["strong", "strong"],
+    ["i", "em"],
+    ["em", "em"],
+    ["u", "u"],
+    ["p", "p"],
+    ["br", "br"],
+    ["ul", "ul"],
+    ["ol", "ol"],
+    ["li", "li"],
+  ])
+  const clipboardBlockTags = new Set([
+    "address",
+    "article",
+    "aside",
+    "blockquote",
+    "div",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "main",
+    "section",
+  ])
+  const discardedClipboardTags = new Set([
+    "audio",
+    "button",
+    "canvas",
+    "embed",
+    "form",
+    "iframe",
+    "img",
+    "input",
+    "link",
+    "math",
+    "meta",
+    "noscript",
+    "object",
+    "script",
+    "select",
+    "style",
+    "svg",
+    "template",
+    "textarea",
+    "video",
+  ])
+
+  function hasBoldStyle(element) {
+    const weight = element.style.fontWeight.toLowerCase()
+    const numericWeight = Number.parseInt(weight, 10)
+    return weight === "bold" || weight === "bolder" || numericWeight >= 600
+  }
+
+  function hasItalicStyle(element) {
+    const style = element.style.fontStyle.toLowerCase()
+    return style === "italic" || style === "oblique"
+  }
+
+  function hasUnderlineStyle(element) {
+    return `${element.style.textDecoration} ${element.style.textDecorationLine}`
+      .toLowerCase()
+      .includes("underline")
+  }
+
+  function sanitizeClipboardChildren(source) {
+    const fragment = document.createDocumentFragment()
+    source.childNodes.forEach(child => {
+      const sanitized = sanitizeClipboardNode(child)
+      if (sanitized) fragment.appendChild(sanitized)
+    })
+    return fragment
+  }
+
+  function sanitizeClipboardNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.nodeValue || "")
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return null
+
+    const source = node
+    const sourceTag = source.tagName.toLowerCase()
+    if (discardedClipboardTags.has(sourceTag)) return null
+
+    let content = sanitizeClipboardChildren(source)
+    const outputTag = clipboardTagMap.get(sourceTag)
+
+    const wrappers = []
+    if (outputTag !== "strong" && hasBoldStyle(source)) wrappers.push("strong")
+    if (outputTag !== "em" && hasItalicStyle(source)) wrappers.push("em")
+    if (outputTag !== "u" && hasUnderlineStyle(source)) wrappers.push("u")
+
+    wrappers.reverse().forEach(tag => {
+      const wrapper = document.createElement(tag)
+      wrapper.appendChild(content)
+      content = wrapper
+    })
+
+    if (!outputTag && !clipboardBlockTags.has(sourceTag)) return content
+
+    const output = document.createElement(outputTag || "p")
+    if (output.tagName !== "BR") output.appendChild(content)
+    return output
+  }
+
+  function plainTextFragment(value) {
+    const fragment = document.createDocumentFragment()
+    value.replace(/\r\n?/g, "\n").split("\n").forEach((line, index) => {
+      if (index) fragment.appendChild(document.createElement("br"))
+      fragment.appendChild(document.createTextNode(line))
+    })
+    return fragment
+  }
+
+  function clipboardFragment(clipboardData) {
+    const html = clipboardData.getData("text/html")
+    if (html) {
+      const parsed = new DOMParser().parseFromString(html, "text/html")
+      const fragment = sanitizeClipboardChildren(parsed.body)
+      if (fragment.childNodes.length) return fragment
+    }
+    return plainTextFragment(clipboardData.getData("text/plain"))
+  }
+
   function normalizeHtml(editor) {
     const clone = editor.cloneNode(true)
     clone.querySelectorAll("div").forEach(block => {
@@ -64,6 +191,26 @@
       textarea.value = normalizeHtml(editor)
     }
 
+    function insertFragment(fragment) {
+      const selection = window.getSelection()
+      if (!selection || !selection.rangeCount || !selectionIsInsideEditor()) {
+        editor.focus()
+        editor.appendChild(fragment)
+        return
+      }
+
+      const range = selection.getRangeAt(0)
+      const lastNode = fragment.lastChild
+      range.deleteContents()
+      range.insertNode(fragment)
+      if (lastNode) {
+        range.setStartAfter(lastNode)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+    }
+
     function resetEditor() {
       textarea.value = initialValue
       editor.innerHTML = initialValue
@@ -107,8 +254,12 @@
     editor.addEventListener("mouseup", rememberSelection)
     editor.addEventListener("focus", rememberSelection)
     editor.addEventListener("paste", event => {
+      if (!event.clipboardData) return
       event.preventDefault()
-      document.execCommand("insertText", false, event.clipboardData.getData("text/plain"))
+      insertFragment(clipboardFragment(event.clipboardData))
+      syncInput()
+      rememberSelection()
+      refreshToolbar()
     })
     field.addEventListener("rich-text:reset", resetEditor)
     field.closest("form")?.addEventListener("submit", syncInput)

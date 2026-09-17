@@ -22,6 +22,15 @@ def test_sanitizer_keeps_formatting_and_removes_dangerous_markup():
     assert "<img" not in cleaned
 
 
+def test_sanitizer_accepts_common_pasted_formatting_variants():
+    cleaned = sanitize_rich_text(
+        '<p><b style="font-weight: 700">Negrita</b> y '
+        '<i class="copied">cursiva</i></p>'
+    )
+
+    assert cleaned == "<p><b>Negrita</b> y <i>cursiva</i></p>"
+
+
 def test_rich_text_empty_markup_has_no_content():
     assert not rich_text_has_content("<p><br></p>")
     assert not rich_text_has_content("<ul><li>&nbsp;</li></ul>")
@@ -30,11 +39,15 @@ def test_rich_text_empty_markup_has_no_content():
 
 def test_reportlab_conversion_preserves_inline_format_and_lists():
     converted = rich_text_to_reportlab(
-        "<p><strong>Bueno</strong> y <em>revisado</em>.</p>"
+        "<p><strong>Bueno</strong>, <b>firme</b> y <em>revisado</em>. "
+        "<i>Confirmado</i>.</p>"
         "<ol><li>Puerta</li><li><u>Ventana</u></li></ol>"
     )
 
-    assert "<b>Bueno</b> y <i>revisado</i>." in converted
+    assert (
+        "<b>Bueno</b>, <b>firme</b> y <i>revisado</i>. <i>Confirmado</i>."
+        in converted
+    )
     assert "1. Puerta" in converted
     assert "2. <u>Ventana</u>" in converted
 

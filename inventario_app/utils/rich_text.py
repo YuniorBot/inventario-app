@@ -6,8 +6,10 @@ from markupsafe import Markup
 
 
 ALLOWED_RICH_TEXT_TAGS = {
+    "b",
     "br",
     "em",
+    "i",
     "li",
     "ol",
     "p",
@@ -53,9 +55,9 @@ class _ReportLabRichTextParser(HTMLParser):
         self.lists: list[dict[str, int | str]] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag == "strong":
+        if tag in {"b", "strong"}:
             self.parts.append("<b>")
-        elif tag == "em":
+        elif tag in {"em", "i"}:
             self.parts.append("<i>")
         elif tag == "u":
             self.parts.append("<u>")
@@ -75,9 +77,9 @@ class _ReportLabRichTextParser(HTMLParser):
                 self.parts.append("&#8226; ")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "strong":
+        if tag in {"b", "strong"}:
             self.parts.append("</b>")
-        elif tag == "em":
+        elif tag in {"em", "i"}:
             self.parts.append("</i>")
         elif tag == "u":
             self.parts.append("</u>")
