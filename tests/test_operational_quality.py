@@ -139,7 +139,7 @@ def test_pdf_with_previous_layout_is_regenerated(client, login, seeded_data, app
     with app.app_context():
         inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
         inventario.pdf_status = "ready"
-        inventario.pdf_filename = f"inventario_{inventario.id}_v2.pdf"
+        inventario.pdf_filename = f"inventario_{inventario.id}_v3.pdf"
         db.session.commit()
         db.session.remove()
 
@@ -398,14 +398,18 @@ def test_pdf_places_description_between_media_summary_and_observations(
     media_index = captured.index(
         "Evidencia multimedia registrada: 1 archivo(s). No incluida en el PDF."
     )
-    descripcion_index = captured.index(
-        "<b>Descripción:</b><br/><br/>Descripcion visible"
-    )
-    observacion_index = captured.index(
-        "<b>Observación:</b><br/><br/>Observacion visible"
-    )
+    descripcion_index = captured.index("Descripción:")
+    descripcion_text_index = captured.index("Descripcion visible")
+    observacion_index = captured.index("Observación:")
+    observacion_text_index = captured.index("Observacion visible")
 
-    assert media_index < descripcion_index < observacion_index
+    assert (
+        media_index
+        < descripcion_index
+        < descripcion_text_index
+        < observacion_index
+        < observacion_text_index
+    )
 
 
 def test_pdf_header_uses_company_name_and_body_has_readable_typography(
@@ -478,17 +482,29 @@ def test_pdf_header_uses_company_name_and_body_has_readable_typography(
     assert drawn_text[0] == seeded_data["empresa_a"].nombre
     assert "Inventario App" not in drawn_text
 
-    description_text, description_style = next(
+    description_label, label_style = next(
         paragraph
         for paragraph in rendered_paragraphs
         if "Descripción:" in paragraph[0]
     )
+    description_text, description_style = next(
+        paragraph
+        for paragraph in rendered_paragraphs
+        if "texto destacado" in paragraph[0]
+    )
+    assert description_label == "Descripción:"
+    assert label_style.fontName == "Helvetica-Bold"
+    assert label_style.fontSize == 12
+    assert label_style.leading == 19.8
+    assert label_style.spaceAfter == 5
+    assert label_style.keepWithNext
     assert description_style.fontName == "Helvetica"
-    assert description_style.fontSize == 11
-    assert description_style.leading == 16
+    assert description_style.fontSize == 12
+    assert description_style.leading == 19.8
     assert description_style.textColor == pdf_service.colors.black
     assert "<b>texto destacado</b>" in description_text
     assert "<font" not in description_text
+    assert "<br/><br/>" not in description_text
 
 
 def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):

@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from html import escape, unescape
 from html.parser import HTMLParser
 
@@ -42,73 +43,145 @@ def rich_text_markup(value: str | None) -> Markup:
 
 
 def rich_text_to_reportlab(value: str | None) -> str:
-    parser = _ReportLabRichTextParser()
+    parts = []
+    for block in rich_text_to_reportlab_blocks(value):
+        if block.kind == "paragraph":
+            parts.append(block.content)
+        elif block.kind == "spacer":
+            parts.append("")
+        else:
+            marker = "&#8226;" if block.kind == "unordered_list" else None
+            items = [
+                f"{marker or f'{index}.'} {item}"
+                for index, item in enumerate(block.items, start=1)
+            ]
+            parts.append("<br/>".join(items))
+    return "<br/><br/>".join(parts)
+
+
+@dataclass(frozen=True)
+class ReportLabRichTextBlock:
+    kind: str
+    content: str = ""
+    items: tuple[str, ...] = ()
+
+
+def rich_text_to_reportlab_blocks(
+    value: str | None,
+) -> list[ReportLabRichTextBlock]:
+    parser = _RichTextTreeParser()
     parser.feed(sanitize_rich_text(value))
     parser.close()
-    return parser.result()
+    return _nodes_to_blocks(parser.nodes)
 
 
-class _ReportLabRichTextParser(HTMLParser):
+@dataclass
+class _RichTextNode:
+    tag: str
+    children: list[str | "_RichTextNode"] = field(default_factory=list)
+
+
+class _RichTextTreeParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-        self.lists: list[dict[str, int | str]] = []
+        self.nodes: list[str | _RichTextNode] = []
+        self._stack = [self.nodes]
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag in {"b", "strong"}:
-            self.parts.append("<b>")
-        elif tag in {"em", "i"}:
-            self.parts.append("<i>")
-        elif tag == "u":
-            self.parts.append("<u>")
-        elif tag == "br":
-            self._line_break()
-        elif tag == "p":
-            self._paragraph_break()
-        elif tag in {"ul", "ol"}:
-            self._paragraph_break()
-            self.lists.append({"tag": tag, "index": 0})
-        elif tag == "li":
-            self._line_break()
-            if self.lists and self.lists[-1]["tag"] == "ol":
-                self.lists[-1]["index"] = int(self.lists[-1]["index"]) + 1
-                self.parts.append(f'{self.lists[-1]["index"]}. ')
-            else:
-                self.parts.append("&#8226; ")
+        node = _RichTextNode(tag)
+        self._stack[-1].append(node)
+        if tag != "br":
+            self._stack.append(node.children)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in {"b", "strong"}:
-            self.parts.append("</b>")
-        elif tag in {"em", "i"}:
-            self.parts.append("</i>")
-        elif tag == "u":
-            self.parts.append("</u>")
-        elif tag == "p":
-            self._paragraph_break()
-        elif tag in {"ul", "ol"}:
-            if self.lists:
-                self.lists.pop()
-            self._paragraph_break()
+        if tag != "br" and len(self._stack) > 1:
+            self._stack.pop()
 
     def handle_data(self, data: str) -> None:
-        self.parts.append(escape(data))
+        self._stack[-1].append(data)
 
-    def result(self) -> str:
-        result = "".join(self.parts)
-        while result.endswith("<br/>"):
-            result = result[:-5]
-        return result
 
-    def _line_break(self) -> None:
-        if self.parts and not self.parts[-1].endswith("<br/>"):
-            self.parts.append("<br/>")
+def _nodes_to_blocks(
+    nodes: list[str | _RichTextNode],
+) -> list[ReportLabRichTextBlock]:
+    blocks = []
+    inline_nodes: list[str | _RichTextNode] = []
 
-    def _paragraph_break(self) -> None:
-        if not self.parts:
+    def flush_inline_nodes() -> None:
+        if not inline_nodes:
             return
-        if self.parts[-1].endswith("<br/><br/>"):
-            return
-        if self.parts[-1].endswith("<br/>"):
-            self.parts.append("<br/>")
+        content = _render_inline(inline_nodes)
+        if _nodes_have_content(inline_nodes):
+            blocks.append(ReportLabRichTextBlock("paragraph", content=content))
+        inline_nodes.clear()
+
+    for node in nodes:
+        if isinstance(node, _RichTextNode) and node.tag == "p":
+            flush_inline_nodes()
+            content = _render_inline(node.children)
+            kind = "paragraph" if _nodes_have_content(node.children) else "spacer"
+            blocks.append(ReportLabRichTextBlock(kind, content=content))
+        elif isinstance(node, _RichTextNode) and node.tag in {"ul", "ol"}:
+            flush_inline_nodes()
+            items = tuple(
+                _render_inline(child.children)
+                for child in node.children
+                if isinstance(child, _RichTextNode)
+                and child.tag == "li"
+                and _nodes_have_content(child.children)
+            )
+            if items:
+                kind = "ordered_list" if node.tag == "ol" else "unordered_list"
+                blocks.append(ReportLabRichTextBlock(kind, items=items))
         else:
-            self.parts.append("<br/><br/>")
+            inline_nodes.append(node)
+
+    flush_inline_nodes()
+    while blocks and blocks[0].kind == "spacer":
+        blocks.pop(0)
+    while blocks and blocks[-1].kind == "spacer":
+        blocks.pop()
+    return blocks
+
+
+def _render_inline(nodes: list[str | _RichTextNode]) -> str:
+    parts = []
+    tag_map = {"b": "b", "strong": "b", "em": "i", "i": "i", "u": "u"}
+    for node in nodes:
+        if isinstance(node, str):
+            normalized = node.replace("\r\n", "\n").replace("\r", "\n")
+            parts.append("<br/>".join(escape(part) for part in normalized.split("\n")))
+            continue
+        if node.tag == "br":
+            parts.append("<br/>")
+            continue
+        reportlab_tag = tag_map.get(node.tag)
+        content = _render_inline(node.children)
+        if reportlab_tag:
+            parts.append(f"<{reportlab_tag}>{content}</{reportlab_tag}>")
+        elif node.tag in {"ul", "ol"}:
+            marker = "&#8226;" if node.tag == "ul" else None
+            items = [
+                _render_inline(child.children)
+                for child in node.children
+                if isinstance(child, _RichTextNode) and child.tag == "li"
+            ]
+            parts.append(
+                "<br/>".join(
+                    f"{marker or f'{index}.'} {item}"
+                    for index, item in enumerate(items, start=1)
+                )
+            )
+        else:
+            parts.append(content)
+    return "".join(parts)
+
+
+def _nodes_have_content(nodes: list[str | _RichTextNode]) -> bool:
+    for node in nodes:
+        if isinstance(node, str):
+            if unescape(node).replace("\xa0", " ").strip():
+                return True
+        elif node.tag != "br" and _nodes_have_content(node.children):
+            return True
+    return False

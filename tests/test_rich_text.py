@@ -5,6 +5,7 @@ from inventario_app.models import Observacion, Seccion
 from inventario_app.utils.rich_text import (
     rich_text_has_content,
     rich_text_to_reportlab,
+    rich_text_to_reportlab_blocks,
     sanitize_rich_text,
 )
 
@@ -50,6 +51,35 @@ def test_reportlab_conversion_preserves_inline_format_and_lists():
     )
     assert "1. Puerta" in converted
     assert "2. <u>Ventana</u>" in converted
+
+
+def test_reportlab_blocks_preserve_paragraphs_breaks_empty_lines_and_lists():
+    blocks = rich_text_to_reportlab_blocks(
+        "<p>Primera línea<br>continuación</p>"
+        "<p><br></p>"
+        "<p><strong>Segundo</strong> párrafo</p>"
+        "<ul><li>Puerta</li><li><em>Ventana</em></li></ul>"
+        "<ol><li><u>Cocina</u></li><li>Sala</li></ol>"
+    )
+
+    assert [block.kind for block in blocks] == [
+        "paragraph",
+        "spacer",
+        "paragraph",
+        "unordered_list",
+        "ordered_list",
+    ]
+    assert blocks[0].content == "Primera línea<br/>continuación"
+    assert blocks[2].content == "<b>Segundo</b> párrafo"
+    assert blocks[3].items == ("Puerta", "<i>Ventana</i>")
+    assert blocks[4].items == ("<u>Cocina</u>", "Sala")
+
+
+def test_reportlab_blocks_preserve_literal_line_breaks_safely():
+    blocks = rich_text_to_reportlab_blocks("Línea uno\nLínea dos")
+
+    assert len(blocks) == 1
+    assert blocks[0].content == "Línea uno<br/>Línea dos"
 
 
 def test_description_sanitizes_rich_text_and_renders_on_public_page(

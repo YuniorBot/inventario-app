@@ -18,7 +18,7 @@ from reportlab.platypus import (
 )
 from ..constants import PDF_LAYOUT_VERSION
 from .media_service import upload_pdf_file
-from ..utils.rich_text import rich_text_to_reportlab
+from ..utils.rich_text import rich_text_to_reportlab_blocks
 
 
 def build_inventory_pdf(inventario, secciones, firmas) -> str:
@@ -52,6 +52,31 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
         leading=16,
         textColor=colors.black,
         spaceAfter=7,
+    )
+    rich_label_style = ParagraphStyle(
+        "InventarioRichLabel",
+        parent=styles["BodyText"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=19.8,
+        textColor=colors.black,
+        spaceAfter=5,
+        keepWithNext=True,
+    )
+    rich_body_style = ParagraphStyle(
+        "InventarioRichBody",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=12,
+        leading=19.8,
+        textColor=colors.black,
+        spaceAfter=0,
+    )
+    rich_list_style = ParagraphStyle(
+        "InventarioRichList",
+        parent=rich_body_style,
+        leftIndent=18,
+        firstLineIndent=-18,
     )
     note_style = ParagraphStyle(
         "InventarioNote",
@@ -131,18 +156,27 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
 
             descripcion = (seccion.descripcion or "").strip()
             if descripcion:
-                elementos.append(
-                    Paragraph(_label_rich_value("Descripción", descripcion), meta_style)
+                elementos.extend(
+                    _rich_text_flowables(
+                        "Descripción",
+                        descripcion,
+                        rich_label_style,
+                        rich_body_style,
+                        rich_list_style,
+                    )
                 )
                 elementos.append(Spacer(1, 10))
 
             tiene_observaciones = False
             for observacion in seccion.observaciones:
                 tiene_observaciones = True
-                elementos.append(
-                    Paragraph(
-                        _label_rich_value("Observación", observacion.comentario),
-                        meta_style,
+                elementos.extend(
+                    _rich_text_flowables(
+                        "Observación",
+                        observacion.comentario,
+                        rich_label_style,
+                        rich_body_style,
+                        rich_list_style,
                     )
                 )
                 elementos.append(Spacer(1, 10))
@@ -208,11 +242,33 @@ def _label_value(label: str, value) -> str:
     return f"<b>{escape(label)}:</b> {_safe_text(value)}"
 
 
-def _label_rich_value(label: str, value) -> str:
-    return (
-        f"<b>{escape(label)}:</b>"
-        f"<br/><br/>{rich_text_to_reportlab(value)}"
-    )
+def _rich_text_flowables(
+    label: str,
+    value,
+    label_style: ParagraphStyle,
+    body_style: ParagraphStyle,
+    list_style: ParagraphStyle,
+) -> list:
+    flowables = [Paragraph(f"{escape(label)}:", label_style)]
+    blocks = rich_text_to_reportlab_blocks(value)
+
+    for block_index, block in enumerate(blocks):
+        if block_index:
+            flowables.append(Spacer(1, 8))
+
+        if block.kind == "paragraph":
+            flowables.append(Paragraph(block.content, body_style))
+        elif block.kind == "spacer":
+            flowables.append(Spacer(1, body_style.leading))
+        else:
+            marker = "&#8226;" if block.kind == "unordered_list" else None
+            for item_index, item in enumerate(block.items, start=1):
+                if item_index > 1:
+                    flowables.append(Spacer(1, 2.4))
+                bullet = marker or f"{item_index}."
+                flowables.append(Paragraph(f"{bullet} {item}", list_style))
+
+    return flowables
 
 
 def _fit_text(value, font_name: str, font_size: float, max_width: float) -> str:
