@@ -6,6 +6,7 @@ from rq import Queue
 
 from ..constants import (
     PDF_ACTIVE_STATUSES,
+    PDF_LAYOUT_VERSION,
     PDF_STATUS_FAILED,
     PDF_STATUS_NOT_STARTED,
     PDF_STATUS_PENDING,
@@ -19,8 +20,13 @@ from .media_service import get_pdf_file_url, pdf_file_exists
 
 def enqueue_inventory_pdf(inventario: Inventario):
     db.session.refresh(inventario)
-    filename = inventario.pdf_filename or f"inventario_{inventario.id}.pdf"
-    if inventario.pdf_status == PDF_STATUS_READY and pdf_file_exists(filename):
+    expected_filename = f"inventario_{inventario.id}_v{PDF_LAYOUT_VERSION}.pdf"
+    filename = inventario.pdf_filename or expected_filename
+    if (
+        inventario.pdf_status == PDF_STATUS_READY
+        and filename == expected_filename
+        and pdf_file_exists(filename)
+    ):
         return inventario
 
     if inventario.pdf_status in PDF_ACTIVE_STATUSES:

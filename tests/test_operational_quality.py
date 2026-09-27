@@ -131,6 +131,28 @@ def test_failed_pdf_can_be_retried(client, login, seeded_data, app):
         assert inventario.pdf_job_id == "job-1"
 
 
+def test_pdf_with_previous_layout_is_regenerated(client, login, seeded_data, app):
+    login(seeded_data["admin_a"].email)
+    _force_async_pdf_queue(app)
+    queue = RecordingPdfQueue()
+
+    with app.app_context():
+        inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
+        inventario.pdf_status = "ready"
+        inventario.pdf_filename = f"inventario_{inventario.id}.pdf"
+        db.session.commit()
+        db.session.remove()
+
+    with patch(
+        "inventario_app.services.pdf_queue_service._get_pdf_queue",
+        return_value=queue,
+    ):
+        response = client.get(f"/inventario_pdf/{seeded_data['inventario_a'].id}")
+
+    assert response.status_code == 302
+    assert len(queue.calls) == 1
+
+
 def test_fresh_pending_pdf_is_not_duplicated(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
     _force_async_pdf_queue(app)
@@ -376,10 +398,100 @@ def test_pdf_places_description_between_media_summary_and_observations(
     media_index = captured.index(
         "Evidencia multimedia registrada: 1 archivo(s). No incluida en el PDF."
     )
-    descripcion_index = captured.index("<b>Descripcion:</b> Descripcion visible")
-    observacion_index = captured.index("<b>Observacion:</b> Observacion visible")
+    descripcion_index = captured.index(
+        '<font color="#153385"><b>Descripción:</b></font>'
+        "<br/><br/>Descripcion visible"
+    )
+    observacion_index = captured.index(
+        '<font color="#153385"><b>Observación:</b></font>'
+        "<br/><br/>Observacion visible"
+    )
 
     assert media_index < descripcion_index < observacion_index
+
+
+def test_pdf_header_uses_company_name_and_body_has_readable_typography(
+    app, seeded_data
+):
+    drawn_text = []
+    rendered_paragraphs = []
+
+    class FakeCanvas:
+        def saveState(self):
+            pass
+
+        def restoreState(self):
+            pass
+
+        def setStrokeColor(self, _color):
+            pass
+
+        def setLineWidth(self, _width):
+            pass
+
+        def line(self, *_args):
+            pass
+
+        def setFillColor(self, _color):
+            pass
+
+        def setFont(self, *_args):
+            pass
+
+        def drawString(self, _x, _y, text):
+            drawn_text.append(text)
+
+        def drawRightString(self, _x, _y, text):
+            drawn_text.append(text)
+
+        def getPageNumber(self):
+            return 1
+
+    class FakeDoc:
+        def __init__(self, filename, *args, **kwargs):
+            self.filename = filename
+            self.leftMargin = kwargs["leftMargin"]
+            self.rightMargin = kwargs["rightMargin"]
+
+        def build(self, _elementos, **kwargs):
+            kwargs["onFirstPage"](FakeCanvas(), self)
+            with open(self.filename, "wb") as pdf_file:
+                pdf_file.write(b"%PDF-1.4\n")
+
+    def capture_paragraph(text, style):
+        rendered_paragraphs.append((text, style))
+        return text
+
+    with app.app_context():
+        seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
+        seccion.descripcion = "Texto normal y <strong>texto destacado</strong>."
+
+        with (
+            patch.object(pdf_service, "SimpleDocTemplate", FakeDoc),
+            patch.object(pdf_service, "Paragraph", capture_paragraph),
+            patch.object(pdf_service, "Spacer", lambda *_args: "SPACER"),
+        ):
+            pdf_service.build_inventory_pdf(
+                seeded_data["inventario_a"],
+                [seccion],
+                [],
+            )
+
+    assert drawn_text[0] == seeded_data["empresa_a"].nombre
+    assert "Inventario App" not in drawn_text
+
+    description_text, description_style = next(
+        paragraph
+        for paragraph in rendered_paragraphs
+        if "Descripción:" in paragraph[0]
+    )
+    assert description_style.fontName == "Helvetica"
+    assert description_style.fontSize == 11
+    assert description_style.leading == 16
+    assert (
+        '<font color="#153385"><b>texto destacado</b></font>'
+        in description_text
+    )
 
 
 def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
@@ -416,10 +528,15 @@ def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
                 [firma],
             )
 
-    assert "<b>Firmado por:</b> Laura Perez" in captured
-    assert "<b>Cédula:</b> 1234567890" in captured
-    assert "<b>Celular:</b> 3001234567" in captured
-    assert "<b>Correo electrónico:</b> laura@example.com" in captured
+    assert (
+        '<font color="#153385"><b>Firmado por:</b></font> Laura Perez' in captured
+    )
+    assert '<font color="#153385"><b>Cédula:</b></font> 1234567890' in captured
+    assert '<font color="#153385"><b>Celular:</b></font> 3001234567' in captured
+    assert (
+        '<font color="#153385"><b>Correo electrónico:</b></font> '
+        "laura@example.com" in captured
+    )
 
 
 def test_pdf_generation_summarizes_media_without_embedding_images(app, seeded_data):

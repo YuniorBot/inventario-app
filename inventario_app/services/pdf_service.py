@@ -8,6 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import (
     Image,
     PageBreak,
@@ -15,13 +16,15 @@ from reportlab.platypus import (
     SimpleDocTemplate,
     Spacer,
 )
+from ..constants import PDF_LAYOUT_VERSION
 from .media_service import upload_pdf_file
 from ..utils.rich_text import rich_text_to_reportlab
 
 
 def build_inventory_pdf(inventario, secciones, firmas) -> str:
     inmueble = inventario.inmueble
-    nombre_pdf = f"inventario_{inventario.id}.pdf"
+    empresa_nombre = inmueble.empresa.nombre
+    nombre_pdf = f"inventario_{inventario.id}_v{PDF_LAYOUT_VERSION}.pdf"
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -44,10 +47,11 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
     meta_style = ParagraphStyle(
         "InventarioMeta",
         parent=styles["BodyText"],
-        fontSize=10.5,
-        leading=14,
-        textColor=colors.HexColor("#243041"),
-        spaceAfter=6,
+        fontName="Helvetica",
+        fontSize=11,
+        leading=16,
+        textColor=colors.HexColor("#374151"),
+        spaceAfter=7,
     )
     note_style = ParagraphStyle(
         "InventarioNote",
@@ -64,24 +68,29 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
         canvas.setLineWidth(1)
         canvas.line(doc.leftMargin, 752, letter[0] - doc.rightMargin, 752)
 
+        inventory_label = f"Inventario #{inventario.id}"
+        right_edge = letter[0] - doc.rightMargin
+        inventory_width = stringWidth(inventory_label, "Helvetica", 9)
+        company_width = right_edge - doc.leftMargin - inventory_width - 18
+
         canvas.setFillColor(colors.HexColor("#153385"))
         canvas.setFont("Helvetica-Bold", 11)
-        canvas.drawString(doc.leftMargin, 764, "Inventario App")
+        canvas.drawString(
+            doc.leftMargin,
+            764,
+            _fit_text(empresa_nombre, "Helvetica-Bold", 11, company_width),
+        )
 
         canvas.setFillColor(colors.HexColor("#5b6472"))
         canvas.setFont("Helvetica", 9)
-        canvas.drawRightString(
-            letter[0] - doc.rightMargin,
-            764,
-            f"Inventario #{inventario.id}",
-        )
+        canvas.drawRightString(right_edge, 764, inventory_label)
 
         canvas.line(doc.leftMargin, 30, letter[0] - doc.rightMargin, 30)
-        canvas.drawString(doc.leftMargin, 18, inmueble.empresa.nombre)
+        canvas.drawString(doc.leftMargin, 18, empresa_nombre)
         canvas.drawRightString(
             letter[0] - doc.rightMargin,
             18,
-            f"Pagina {canvas.getPageNumber()}",
+            f"Página {canvas.getPageNumber()}",
         )
         canvas.restoreState()
 
@@ -91,16 +100,16 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
             Paragraph("Inventario de Entrega de Inmueble", title_style),
             Paragraph("Resumen general del recorrido documentado.", note_style),
             Spacer(1, 12),
-            Paragraph(_label_value("Empresa", inmueble.empresa.nombre), meta_style),
-            Paragraph(_label_value("Direccion", inmueble.direccion), meta_style),
-            Paragraph(_label_value("Fecha de recepcion", inmueble.fecha_recepcion), meta_style),
+            Paragraph(_label_value("Empresa", empresa_nombre), meta_style),
+            Paragraph(_label_value("Dirección", inmueble.direccion), meta_style),
+            Paragraph(_label_value("Fecha de recepción", inmueble.fecha_recepcion), meta_style),
             Paragraph(_label_value("Inventario", inventario.nombre), meta_style),
             Paragraph(_label_value("Fecha inventario", inventario.fecha), meta_style),
             Spacer(1, 18),
         ]
 
         for seccion in secciones:
-            elementos.append(Paragraph(f"Seccion: {_safe_text(seccion.nombre)}", section_style))
+            elementos.append(Paragraph(f"Sección: {_safe_text(seccion.nombre)}", section_style))
             elementos.append(
                 Paragraph(
                     f"<b>Archivos:</b> {len(seccion.fotos)} | <b>Observaciones:</b> {len(seccion.observaciones)}",
@@ -123,7 +132,7 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
             descripcion = (seccion.descripcion or "").strip()
             if descripcion:
                 elementos.append(
-                    Paragraph(_label_rich_value("Descripcion", descripcion), meta_style)
+                    Paragraph(_label_rich_value("Descripción", descripcion), meta_style)
                 )
                 elementos.append(Spacer(1, 10))
 
@@ -132,7 +141,7 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
                 tiene_observaciones = True
                 elementos.append(
                     Paragraph(
-                        _label_rich_value("Observacion", observacion.comentario),
+                        _label_rich_value("Observación", observacion.comentario),
                         meta_style,
                     )
                 )
@@ -196,8 +205,22 @@ def _safe_text(value) -> str:
 
 
 def _label_value(label: str, value) -> str:
-    return f"<b>{escape(label)}:</b> {_safe_text(value)}"
+    return f'<font color="#153385"><b>{escape(label)}:</b></font> {_safe_text(value)}'
 
 
 def _label_rich_value(label: str, value) -> str:
-    return f"<b>{escape(label)}:</b> {rich_text_to_reportlab(value)}"
+    return (
+        f'<font color="#153385"><b>{escape(label)}:</b></font>'
+        f"<br/><br/>{rich_text_to_reportlab(value)}"
+    )
+
+
+def _fit_text(value, font_name: str, font_size: float, max_width: float) -> str:
+    text = "" if value is None else str(value)
+    if stringWidth(text, font_name, font_size) <= max_width:
+        return text
+
+    suffix = "..."
+    while text and stringWidth(f"{text}{suffix}", font_name, font_size) > max_width:
+        text = text[:-1]
+    return f"{text.rstrip()}{suffix}"
