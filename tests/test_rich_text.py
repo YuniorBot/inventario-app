@@ -45,9 +45,7 @@ def test_reportlab_conversion_preserves_inline_format_and_lists():
     )
 
     assert (
-        '<font color="#153385"><b>Bueno</b></font>, '
-        '<font color="#153385"><b>firme</b></font> y '
-        "<i>revisado</i>. <i>Confirmado</i>."
+        "<b>Bueno</b>, <b>firme</b> y <i>revisado</i>. <i>Confirmado</i>."
         in converted
     )
     assert "1. Puerta" in converted

@@ -139,7 +139,7 @@ def test_pdf_with_previous_layout_is_regenerated(client, login, seeded_data, app
     with app.app_context():
         inventario = db.session.get(Inventario, seeded_data["inventario_a"].id)
         inventario.pdf_status = "ready"
-        inventario.pdf_filename = f"inventario_{inventario.id}.pdf"
+        inventario.pdf_filename = f"inventario_{inventario.id}_v2.pdf"
         db.session.commit()
         db.session.remove()
 
@@ -399,12 +399,10 @@ def test_pdf_places_description_between_media_summary_and_observations(
         "Evidencia multimedia registrada: 1 archivo(s). No incluida en el PDF."
     )
     descripcion_index = captured.index(
-        '<font color="#153385"><b>Descripción:</b></font>'
-        "<br/><br/>Descripcion visible"
+        "<b>Descripción:</b><br/><br/>Descripcion visible"
     )
     observacion_index = captured.index(
-        '<font color="#153385"><b>Observación:</b></font>'
-        "<br/><br/>Observacion visible"
+        "<b>Observación:</b><br/><br/>Observacion visible"
     )
 
     assert media_index < descripcion_index < observacion_index
@@ -488,10 +486,9 @@ def test_pdf_header_uses_company_name_and_body_has_readable_typography(
     assert description_style.fontName == "Helvetica"
     assert description_style.fontSize == 11
     assert description_style.leading == 16
-    assert (
-        '<font color="#153385"><b>texto destacado</b></font>'
-        in description_text
-    )
+    assert description_style.textColor == pdf_service.colors.black
+    assert "<b>texto destacado</b>" in description_text
+    assert "<font" not in description_text
 
 
 def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
@@ -528,15 +525,10 @@ def test_pdf_shows_optional_signature_contact_fields(app, seeded_data):
                 [firma],
             )
 
-    assert (
-        '<font color="#153385"><b>Firmado por:</b></font> Laura Perez' in captured
-    )
-    assert '<font color="#153385"><b>Cédula:</b></font> 1234567890' in captured
-    assert '<font color="#153385"><b>Celular:</b></font> 3001234567' in captured
-    assert (
-        '<font color="#153385"><b>Correo electrónico:</b></font> '
-        "laura@example.com" in captured
-    )
+    assert "<b>Firmado por:</b> Laura Perez" in captured
+    assert "<b>Cédula:</b> 1234567890" in captured
+    assert "<b>Celular:</b> 3001234567" in captured
+    assert "<b>Correo electrónico:</b> laura@example.com" in captured
 
 
 def test_pdf_generation_summarizes_media_without_embedding_images(app, seeded_data):

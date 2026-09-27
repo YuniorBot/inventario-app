@@ -50,7 +50,7 @@ def build_inventory_pdf(inventario, secciones, firmas) -> str:
         fontName="Helvetica",
         fontSize=11,
         leading=16,
-        textColor=colors.HexColor("#374151"),
+        textColor=colors.black,
         spaceAfter=7,
     )
     note_style = ParagraphStyle(
@@ -205,12 +205,12 @@ def _safe_text(value) -> str:
 
 
 def _label_value(label: str, value) -> str:
-    return f'<font color="#153385"><b>{escape(label)}:</b></font> {_safe_text(value)}'
+    return f"<b>{escape(label)}:</b> {_safe_text(value)}"
 
 
 def _label_rich_value(label: str, value) -> str:
     return (
-        f'<font color="#153385"><b>{escape(label)}:</b></font>'
+        f"<b>{escape(label)}:</b>"
         f"<br/><br/>{rich_text_to_reportlab(value)}"
     )
 

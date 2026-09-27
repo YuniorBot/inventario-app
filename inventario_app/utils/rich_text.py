@@ -56,7 +56,7 @@ class _ReportLabRichTextParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs) -> None:
         if tag in {"b", "strong"}:
-            self.parts.append('<font color="#153385"><b>')
+            self.parts.append("<b>")
         elif tag in {"em", "i"}:
             self.parts.append("<i>")
         elif tag == "u":
@@ -78,7 +78,7 @@ class _ReportLabRichTextParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if tag in {"b", "strong"}:
-            self.parts.append("</b></font>")
+            self.parts.append("</b>")
         elif tag in {"em", "i"}:
             self.parts.append("</i>")
         elif tag == "u":
