@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from html import escape, unescape
 from html.parser import HTMLParser
