@@ -111,6 +111,40 @@ def test_description_sanitizes_rich_text_and_renders_on_public_page(
     assert '<script>alert("xss")</script>' not in body
 
 
+def test_mixed_description_format_is_saved_rendered_and_converted_for_pdf(
+    client, login, seeded_data, app
+):
+    description = (
+        "<p>Texto normal <strong>texto en negrita</strong> y texto normal, "
+        "<em>cursiva</em> y <u>subrayado</u>.</p>"
+        "<p>Segundo párrafo.</p>"
+    )
+    login(seeded_data["admin_a"].email)
+
+    response = client.post(
+        f"/guardar_descripcion/{seeded_data['seccion_a'].id}",
+        data={"descripcion": description},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    with app.app_context():
+        seccion = db.session.get(Seccion, seeded_data["seccion_a"].id)
+        assert seccion.descripcion == description
+
+    public_response = client.get(f"/publico/{seeded_data['inventario_a'].token}")
+    body = public_response.get_data(as_text=True)
+    blocks = rich_text_to_reportlab_blocks(description)
+
+    assert description in body
+    assert [block.kind for block in blocks] == ["paragraph", "paragraph"]
+    assert blocks[0].content == (
+        "Texto normal <b>texto en negrita</b> y texto normal, "
+        "<i>cursiva</i> y <u>subrayado</u>."
+    )
+    assert blocks[1].content == "Segundo párrafo."
+
+
 def test_empty_rich_text_description_is_stored_as_null(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 

@@ -58,35 +58,90 @@
     "video",
   ])
 
-  function hasBoldStyle(element) {
+  const emptyFormatState = Object.freeze({
+    bold: false,
+    italic: false,
+    underline: false,
+  })
+  const inlineFormatTags = new Set(["b", "strong", "i", "em", "u"])
+
+  function explicitBoldStyle(element) {
     const weight = element.style.fontWeight.toLowerCase()
     const numericWeight = Number.parseInt(weight, 10)
-    return weight === "bold" || weight === "bolder" || numericWeight >= 600
+    if (weight === "bold" || weight === "bolder" || numericWeight >= 600) {
+      return true
+    }
+    if (
+      weight === "normal" ||
+      weight === "lighter" ||
+      (numericWeight >= 100 && numericWeight <= 500)
+    ) {
+      return false
+    }
+    return null
   }
 
-  function hasItalicStyle(element) {
+  function explicitItalicStyle(element) {
     const style = element.style.fontStyle.toLowerCase()
-    return style === "italic" || style === "oblique"
+    if (style === "italic" || style === "oblique") return true
+    if (style === "normal") return false
+    return null
   }
 
-  function hasUnderlineStyle(element) {
-    return `${element.style.textDecoration} ${element.style.textDecorationLine}`
+  function explicitUnderlineStyle(element) {
+    const decoration = `${element.style.textDecoration} ${element.style.textDecorationLine}`
+      .trim()
       .toLowerCase()
-      .includes("underline")
+    if (!decoration) return null
+    if (decoration.includes("underline")) return true
+    if (decoration.includes("none")) return false
+    return null
   }
 
-  function sanitizeClipboardChildren(source) {
+  function elementFormatState(element, inheritedState) {
+    const sourceTag = element.tagName.toLowerCase()
+    const state = { ...inheritedState }
+
+    if (sourceTag === "b" || sourceTag === "strong") state.bold = true
+    if (sourceTag === "i" || sourceTag === "em") state.italic = true
+    if (sourceTag === "u") state.underline = true
+
+    const bold = explicitBoldStyle(element)
+    const italic = explicitItalicStyle(element)
+    const underline = explicitUnderlineStyle(element)
+    if (bold !== null) state.bold = bold
+    if (italic !== null) state.italic = italic
+    if (underline !== null) state.underline = underline
+    return state
+  }
+
+  function formattedTextNode(value, formatState) {
+    let content = document.createTextNode(value || "")
+    const wrappers = []
+    if (formatState.bold) wrappers.push("strong")
+    if (formatState.italic) wrappers.push("em")
+    if (formatState.underline) wrappers.push("u")
+
+    wrappers.reverse().forEach(tag => {
+      const wrapper = document.createElement(tag)
+      wrapper.appendChild(content)
+      content = wrapper
+    })
+    return content
+  }
+
+  function sanitizeClipboardChildren(source, inheritedState = emptyFormatState) {
     const fragment = document.createDocumentFragment()
     source.childNodes.forEach(child => {
-      const sanitized = sanitizeClipboardNode(child)
+      const sanitized = sanitizeClipboardNode(child, inheritedState)
       if (sanitized) fragment.appendChild(sanitized)
     })
     return fragment
   }
 
-  function sanitizeClipboardNode(node) {
+  function sanitizeClipboardNode(node, inheritedState) {
     if (node.nodeType === Node.TEXT_NODE) {
-      return document.createTextNode(node.nodeValue || "")
+      return formattedTextNode(node.nodeValue, inheritedState)
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return null
 
@@ -94,20 +149,10 @@
     const sourceTag = source.tagName.toLowerCase()
     if (discardedClipboardTags.has(sourceTag)) return null
 
-    let content = sanitizeClipboardChildren(source)
+    const formatState = elementFormatState(source, inheritedState)
+    const content = sanitizeClipboardChildren(source, formatState)
     const outputTag = clipboardTagMap.get(sourceTag)
-
-    const wrappers = []
-    if (outputTag !== "strong" && hasBoldStyle(source)) wrappers.push("strong")
-    if (outputTag !== "em" && hasItalicStyle(source)) wrappers.push("em")
-    if (outputTag !== "u" && hasUnderlineStyle(source)) wrappers.push("u")
-
-    wrappers.reverse().forEach(tag => {
-      const wrapper = document.createElement(tag)
-      wrapper.appendChild(content)
-      content = wrapper
-    })
-
+    if (inlineFormatTags.has(sourceTag)) return content
     if (!outputTag && !clipboardBlockTags.has(sourceTag)) return content
 
     const output = document.createElement(outputTag || "p")
@@ -132,6 +177,40 @@
       if (fragment.childNodes.length) return fragment
     }
     return plainTextFragment(clipboardData.getData("text/plain"))
+  }
+
+  function splitActiveFormatting(range, editor) {
+    const marker = document.createTextNode("")
+    range.insertNode(marker)
+    let ancestor = marker.parentElement
+
+    while (ancestor && ancestor !== editor) {
+      const parent = ancestor.parentNode
+      if (!inlineFormatTags.has(ancestor.tagName.toLowerCase())) {
+        ancestor = parent
+        continue
+      }
+
+      const trailingRange = document.createRange()
+      trailingRange.setStartAfter(marker)
+      trailingRange.setEnd(ancestor, ancestor.childNodes.length)
+      const trailingContent = trailingRange.extractContents()
+      const trailingWrapper = ancestor.cloneNode(false)
+      trailingWrapper.appendChild(trailingContent)
+
+      parent.insertBefore(marker, ancestor.nextSibling)
+      if (trailingWrapper.hasChildNodes()) {
+        parent.insertBefore(trailingWrapper, marker.nextSibling)
+      }
+      if (!ancestor.hasChildNodes()) ancestor.remove()
+      ancestor = parent
+    }
+
+    const insertionRange = document.createRange()
+    insertionRange.setStartBefore(marker)
+    insertionRange.collapse(true)
+    marker.remove()
+    return insertionRange
   }
 
   function normalizeHtml(editor) {
@@ -199,9 +278,10 @@
         return
       }
 
-      const range = selection.getRangeAt(0)
+      let range = selection.getRangeAt(0)
       const lastNode = fragment.lastChild
       range.deleteContents()
+      range = splitActiveFormatting(range, editor)
       range.insertNode(fragment)
       if (lastNode) {
         range.setStartAfter(lastNode)
