@@ -1797,6 +1797,16 @@ select:focus-visible {
   border-left: 4px solid rgba(21, 51, 133, 0.16);
 }
 
+.signature-form-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.signature-form-panel[hidden] {
+  display: none;
+}
+
 .observation-card p {
   margin-top: 0;
   line-height: 1.65;

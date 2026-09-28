@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from inventario_app.extensions import db
@@ -568,3 +569,32 @@ def test_viewer_can_open_inventory_without_signature_canvas(client, login, seede
     assert response.status_code == 200
     assert 'id="canvas"' not in body
     assert "if (canvas)" in body
+
+
+def test_signature_form_starts_hidden_and_keeps_saved_signatures(
+    client, login, seeded_data, app
+):
+    with app.app_context():
+        signature = Firma(
+            inventario_id=seeded_data["inventario_a"].id,
+            nombre="Firma existente",
+            imagen="data:image/png;base64,AA==",
+        )
+        db.session.add(signature)
+        db.session.commit()
+        signature_id = signature.id
+
+    login(seeded_data["admin_a"].email)
+    response = client.get(f"/inventario/{seeded_data['inventario_a'].id}")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert body.count(f'/guardar_firma/{seeded_data["inventario_a"].id}') == 1
+    assert '>Firma inventario</button>' in body
+    assert 'id="formulario-firma"' in body
+    assert 'class="stack signature-form-panel"' in body
+    assert 'id="cancelar-firma"' in body
+    assert re.search(r'id="formulario-firma"[\s\S]*?hidden', body)
+
+    with app.app_context():
+        assert db.session.get(Firma, signature_id) is not None

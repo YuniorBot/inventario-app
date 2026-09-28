@@ -161,7 +161,22 @@
   </div>
 
   {% if can_edit %}
-  <form action="/guardar_firma/{{ inventario.id }}" method="POST" class="stack" onsubmit="guardarFirma()">
+  <button
+    type="button"
+    class="button"
+    id="abrir-firma"
+    aria-controls="formulario-firma"
+    aria-expanded="false"
+  >Firma inventario</button>
+
+  <form
+    id="formulario-firma"
+    action="/guardar_firma/{{ inventario.id }}"
+    method="POST"
+    class="stack signature-form-panel"
+    onsubmit="guardarFirma()"
+    hidden
+  >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="firma-nombre">Nombre de quien firma</label>
@@ -192,6 +207,7 @@
     <div class="split-actions">
       <button type="submit">Guardar firma</button>
       <button type="button" class="button button-secondary" onclick="limpiar()">Limpiar</button>
+      <button type="button" class="button button-secondary" id="cancelar-firma">Cancelar</button>
     </div>
   </form>
   {% else %}
@@ -240,9 +256,14 @@
   const canvas = document.getElementById("canvas")
   if (canvas) {
     const ctx = canvas.getContext("2d")
+    const signatureForm = document.getElementById("formulario-firma")
+    const signatureTrigger = document.getElementById("abrir-firma")
+    const signatureCancel = document.getElementById("cancelar-firma")
+    const signatureValue = document.getElementById("firma")
     let dibujando = false
 
     function ajustarCanvas() {
+      if (signatureForm.hidden) return
       const ratio = Math.max(window.devicePixelRatio || 1, 1)
       const rect = canvas.getBoundingClientRect()
       canvas.width = rect.width * ratio
@@ -288,6 +309,7 @@
 
     function limpiar() {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
+      signatureValue.value = ""
     }
 
     function guardarFirma() {
@@ -297,7 +319,28 @@
     window.limpiar = limpiar
     window.guardarFirma = guardarFirma
 
+    function abrirFormularioFirma() {
+      signatureForm.reset()
+      limpiar()
+      signatureForm.hidden = false
+      signatureTrigger.setAttribute("aria-expanded", "true")
+      window.requestAnimationFrame(() => {
+        ajustarCanvas()
+        document.getElementById("firma-nombre").focus()
+      })
+    }
+
+    function cancelarFormularioFirma() {
+      signatureForm.reset()
+      limpiar()
+      signatureForm.hidden = true
+      signatureTrigger.setAttribute("aria-expanded", "false")
+      signatureTrigger.focus()
+    }
+
     window.addEventListener("resize", ajustarCanvas)
+    signatureTrigger.addEventListener("click", abrirFormularioFirma)
+    signatureCancel.addEventListener("click", cancelarFormularioFirma)
     canvas.addEventListener("mousedown", empezar)
     canvas.addEventListener("mouseup", terminar)
     canvas.addEventListener("mouseleave", terminar)
@@ -305,7 +348,6 @@
     canvas.addEventListener("touchstart", empezar, { passive: false })
     canvas.addEventListener("touchend", terminar, { passive: false })
     canvas.addEventListener("touchmove", dibujar, { passive: false })
-    ajustarCanvas()
   }
 </script>
 {% endblock %}
