@@ -1855,6 +1855,7 @@ select:focus-visible {
   display: none;
 }
 
+.property-edit-form[hidden],
 .reception-date-form[hidden],
 .inventory-date-form[hidden] {
   display: none;

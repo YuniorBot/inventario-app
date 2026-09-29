@@ -80,13 +80,19 @@
         <strong>Direccion</strong>
         <p>{{ inmueble.direccion }}</p>
         {% if can_edit %}
-        <form action="/editar_direccion_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+        <button type="button" class="button button-secondary" data-property-edit-toggle="address-form-{{ inmueble.id }}" data-closed-label="Actualizar dirección" aria-controls="address-form-{{ inmueble.id }}" aria-expanded="false">
+          Actualizar dirección
+        </button>
+        <form action="/editar_direccion_inmueble/{{ inmueble.id }}" method="POST" class="stack property-edit-form" id="address-form-{{ inmueble.id }}" hidden>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div>
             <label for="direccion-inmueble">Editar dirección</label>
             <input id="direccion-inmueble" type="text" name="direccion" autocomplete="street-address" value="{{ inmueble.direccion }}" required>
           </div>
-          <button type="submit" class="button button-secondary">Actualizar dirección</button>
+          <div class="inline-actions">
+            <button type="submit" class="button button-secondary">Guardar cambios</button>
+            <button type="button" class="button button-secondary" data-property-edit-cancel="address-form-{{ inmueble.id }}">Cancelar</button>
+          </div>
         </form>
         {% endif %}
       </article>
@@ -94,13 +100,19 @@
         <strong>Propietario</strong>
         <p>{{ inmueble.propietario }}</p>
         {% if can_edit %}
-        <form action="/editar_propietario_inmueble/{{ inmueble.id }}" method="POST" class="stack">
+        <button type="button" class="button button-secondary" data-property-edit-toggle="owner-form-{{ inmueble.id }}" data-closed-label="Actualizar propietario" aria-controls="owner-form-{{ inmueble.id }}" aria-expanded="false">
+          Actualizar propietario
+        </button>
+        <form action="/editar_propietario_inmueble/{{ inmueble.id }}" method="POST" class="stack property-edit-form" id="owner-form-{{ inmueble.id }}" hidden>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div>
             <label for="propietario-inmueble">Editar propietario</label>
             <input id="propietario-inmueble" type="text" name="propietario" autocomplete="name" value="{{ inmueble.propietario }}" required>
           </div>
-          <button type="submit" class="button button-secondary">Actualizar propietario</button>
+          <div class="inline-actions">
+            <button type="submit" class="button button-secondary">Guardar cambios</button>
+            <button type="button" class="button button-secondary" data-property-edit-cancel="owner-form-{{ inmueble.id }}">Cancelar</button>
+          </div>
         </form>
         {% endif %}
       </article>
@@ -273,6 +285,40 @@
         }
         if (toggle) {
           toggle.textContent = "Actualizar fecha"
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-property-edit-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const form = document.getElementById(button.dataset.propertyEditToggle)
+        if (!form) {
+          return
+        }
+
+        form.hidden = !form.hidden
+        button.textContent = form.hidden ? button.dataset.closedLabel : "Ocultar edición"
+        button.setAttribute("aria-expanded", String(!form.hidden))
+
+        if (!form.hidden) {
+          const input = form.querySelector("input[type='text']")
+          input?.focus()
+          input?.select()
+        }
+      })
+    })
+
+    document.querySelectorAll("[data-property-edit-cancel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const formId = button.dataset.propertyEditCancel
+        const form = document.getElementById(formId)
+        const toggle = document.querySelector(`[data-property-edit-toggle='${formId}']`)
+        if (form) {
+          form.hidden = true
+        }
+        if (toggle) {
+          toggle.textContent = toggle.dataset.closedLabel
+          toggle.setAttribute("aria-expanded", "false")
         }
       })
     })
