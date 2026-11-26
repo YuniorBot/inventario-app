@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set public_inventory_url = url_for('public.inventario_publico', token=inventario.token) %}
 
 {% block title %}{{ inventario.nombre }} | Inventario App{% endblock %}
 
@@ -17,7 +18,13 @@
         <span class="chip">ID {{ inventario.id }}</span>
       </div>
       <div class="hero-actions">
-        <a class="button" href="/publico/{{ inventario.token }}" target="_blank" rel="noopener noreferrer">Ver Link Público</a>
+        <a class="button" id="public-inventory-link" href="{{ public_inventory_url }}" target="_blank" rel="noopener noreferrer">Ver Link Público</a>
+        <div class="public-link-share" id="public-link-share" hidden>
+          <label for="public-link-url">Enlace público</label>
+          <input id="public-link-url" type="text" readonly spellcheck="false">
+          <button class="button button-secondary" id="copy-public-link" type="button">Copiar enlace</button>
+          <span class="public-link-status" id="public-link-status" role="status"></span>
+        </div>
         {% if inventario.pdf_status == "ready" %}
         <a class="button button-secondary" href="/media/pdfs/{{ inventario.id }}">Descargar PDF</a>
         {% elif inventario.pdf_status in ["pending", "processing"] %}
@@ -72,7 +79,7 @@
   <aside class="info-panel fade-in delay-2">
     <h3>Acciones clave</h3>
     <div class="stack">
-      <a class="button" href="/publico/{{ inventario.token }}" target="_blank" rel="noopener noreferrer">Abrir Vista Pública</a>
+      <a class="button" href="{{ public_inventory_url }}" target="_blank" rel="noopener noreferrer">Abrir Vista Pública</a>
       {% if inventario.pdf_status == "ready" %}
       <a class="button button-secondary" id="pdf-action" href="/media/pdfs/{{ inventario.id }}">Descargar PDF</a>
       {% elif inventario.pdf_status in ["pending", "processing"] %}
@@ -220,6 +227,30 @@
 
 {% block scripts %}
 <script>
+  const publicLinkShare = document.getElementById("public-link-share")
+  const publicLinkInput = document.getElementById("public-link-url")
+  const publicLinkStatus = document.getElementById("public-link-status")
+  const publicLinkUrl = document.getElementById("public-inventory-link").href
+
+  publicLinkInput.value = publicLinkUrl
+  publicLinkShare.hidden = false
+
+  document.getElementById("copy-public-link").addEventListener("click", async () => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(publicLinkUrl)
+        publicLinkStatus.textContent = "Enlace copiado"
+        return
+      } catch {
+        // Algunos navegadores bloquean el portapapeles.
+      }
+    }
+
+    publicLinkInput.focus()
+    publicLinkInput.select()
+    publicLinkStatus.textContent = "Copia manualmente el enlace seleccionado."
+  })
+
   const pdfStatusPanel = document.getElementById("pdf-status-panel")
   if (pdfStatusPanel) {
     const statusUrl = pdfStatusPanel.dataset.statusUrl

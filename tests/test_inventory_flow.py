@@ -6,6 +6,22 @@ from inventario_app.models import Firma, Foto, Inmueble, Inventario, Observacion
 from inventario_app.services.media_service import get_upload_object_key
 
 
+def test_inventory_shows_share_controls_below_the_public_link(client, login, seeded_data):
+    login(seeded_data["editor_a"].email)
+    inventario = seeded_data["inventario_a"]
+
+    response = client.get(f"/inventario/{inventario.id}")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert f'id="public-inventory-link" href="/publico/{inventario.token}"' in body
+    assert 'id="public-link-url" type="text" readonly' in body
+    assert 'id="copy-public-link" type="button">Copiar enlace</button>' in body
+    assert 'id="public-link-status" role="status"' in body
+    assert body.index('id="public-inventory-link"') < body.index('id="public-link-share"')
+    assert body.index('id="copy-public-link"') < body.index(">Generar PDF</a>")
+
+
 def test_admin_can_create_inmueble(client, login, seeded_data, app):
     login(seeded_data["admin_a"].email)
 
